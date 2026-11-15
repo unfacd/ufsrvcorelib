@@ -1,0 +1,13 @@
+# Language filters and parsing rules
+language=c
+CCN=10
+arguments=5
+
+# Structural rules specifically for C logic
+modified
+no_preprocessing
+
+# File exclusions (Modify these to match your project layout)
+exclude=./tests/*
+exclude=./build/*
+exclude=./packages/*

@@ -1,0 +1,11 @@
+prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=${prefix}
+libdir=${exec_prefix}/@CMAKE_INSTALL_LIBDIR@
+includedir=${prefix}/@CMAKE_INSTALL_INCLUDEDIR@
+
+Name: ufsrvcorelib
+Description: Core library for ufsrv platform (CPU affinity, thread management)
+Version: @ufsrvcorelib_VERSION@
+Requires.private: uflib
+Libs: -L${libdir} -lufsrvcorelib
+Cflags: -I${includedir} -I${includedir}/ufsrvcorelib

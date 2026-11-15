@@ -1,0 +1,24 @@
+build/
+*.o
+*.a
+*.so
+*.deb
+/build_test/
+html/
+/.claude/worktrees/ufsrv-config-args/
+/.claude/worktrees/ufsrv-provider/
+# Staging — build artefacts (git checkout + generator output)
+dev/scripts/ufsrv_config_generator/generated/*
+!dev/scripts/ufsrv_config_generator/generated/.gitkeep
+dev/scripts/ufsrv_config_generator/ufsrv_config.*
+dev/scripts/ufsrv_config_generator/ufsrv_config_generic_callbacks*
+dev/scripts/ufsrv_config_generator/ufsrvcorelib/
+dev/scripts/ufsrv_config_generator/build_input/
+dev/scripts/ufsrv_config_generator/gen_host
+# Composer output — build artefact
+src/ufsrv_config/
+__pycache__/
+/.cache/
+.idea/
+build_test/
+build_natural/

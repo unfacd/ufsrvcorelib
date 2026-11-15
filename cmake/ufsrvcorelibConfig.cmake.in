@@ -1,0 +1,37 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+find_dependency(uflib)
+find_dependency(OpenSSL)
+find_dependency(PkgConfig)
+pkg_check_modules(LUA REQUIRED IMPORTED_TARGET lua)
+pkg_check_modules(JSONC REQUIRED IMPORTED_TARGET json-c)
+pkg_check_modules(JEMALLOC REQUIRED IMPORTED_TARGET jemalloc)
+
+get_filename_component(ufsrvcorelib_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
+
+if(NOT TARGET ufsrvcorelib::ufsrvcorelib)
+    include("${ufsrvcorelib_CMAKE_DIR}/ufsrvcorelibTargets.cmake")
+    # The exported targets are suffixed (_static / _shared / _packages); expose
+    # the umbrella name consumers link against. Shared wins when the install
+    # carries it: a consumer that links both flavours — or two components that
+    # each embed the static one — ends up with two copies of the same state.
+    # -DUFSRV_CORELIB_LINK_STATIC=ON pins the archive for a static-only prefix.
+    if(TARGET ufsrvcorelib::ufsrvcorelib_shared AND NOT UFSRV_CORELIB_LINK_STATIC)
+        add_library(ufsrvcorelib::ufsrvcorelib INTERFACE IMPORTED)
+        set_target_properties(ufsrvcorelib::ufsrvcorelib PROPERTIES
+            INTERFACE_LINK_LIBRARIES ufsrvcorelib::ufsrvcorelib_shared)
+    elseif(TARGET ufsrvcorelib::ufsrvcorelib_static)
+        add_library(ufsrvcorelib::ufsrvcorelib INTERFACE IMPORTED)
+        set_target_properties(ufsrvcorelib::ufsrvcorelib PROPERTIES
+            INTERFACE_LINK_LIBRARIES ufsrvcorelib::ufsrvcorelib_static)
+    endif()
+endif()
+
+set(ufsrvcorelib_LIBRARIES ufsrvcorelib::ufsrvcorelib)
+
+# Canonical host orchestration modules (compose orchestrator, verifier, rewrite,
+# merge, clean, bootstrap and check).  Consumers must resolve these through this
+# variable instead of vendoring copies into their own trees.
+set_and_check(ufsrvcorelib_HOST_MODULES_DIR
+    "${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_DATADIR@/@_PROJECT_NAME@/cmake-modules/ufsrv_config/host")

@@ -1,0 +1,193 @@
+#ifndef CSONPATH_JSON_C_H_
+#define CSONPATH_JSON_C_H_
+//fetched from https://github.com/outscale/csonpath/blob/main/csonpath_json-c.h f80029db59e7599ceda4a55d8bf2c68ca81bb7b2 7/9/2026
+#include <errno.h>
+#include <assert.h>
+#include <string.h>
+#include <ctype.h>
+#include <json-c/json.h>
+
+#define CSONPATH_JSON struct json_object *
+
+#define CSONPATH_NULL NULL
+
+#define CSONPATH_GET csonpath_json_c_get
+
+#define CSONPATH_AT csonpath_json_c_at
+
+struct csonpath_child_info;
+typedef void (*json_c_callback)(json_object *, struct csonpath_child_info *, json_object *, void *);
+
+#define CSONPATH_CALLBACK json_c_callback
+
+#define CSONPATH_CALLBACK_DATA void *
+
+#define CSONPATH_CALL_CALLBACK(callback, ctx, child_info, tmp, udata)	\
+  (callback(ctx, child_info, tmp, udata), 0)
+
+
+#define CSONPATH_NEED_FOREACH_REDO(o)		\
+  json_object_is_type(o, json_type_object)
+
+#define CSONPATH_REMOVE(o) json_object_put(o)
+
+#define CSONPATH_INREF(o) json_object_get(o)
+
+#define CSONPATH_IS_NULL(o) (o == NULL || json_object_is_type(o, json_type_null))
+
+#define CSONPATH_IS_OBJ(o) json_object_is_type(o, json_type_object)
+
+#define CSONPATH_IS_ARRAY(o) json_object_is_type(o, json_type_array)
+
+#define CSONPATH_IS_STR(o) json_object_is_type(o, json_type_string)
+
+#define CSONPATH_IS_NUM(o) json_object_is_type(o, json_type_int)
+
+#define CSONPATH_IS_BOOL(o) json_object_is_type(o, json_type_boolean)
+
+#define CSONPATH_GET_BOOL(o) json_object_get_boolean(o)
+
+#define CSONPATH_GET_STR(obj)			\
+    json_object_get_string(obj)
+
+#define CSONPATH_GET_NUM(obj)			\
+    json_object_get_int(obj)
+
+#define CSONPATH_EQUAL_STR(obj, to_cmp)	({			\
+      _Bool r = 0;						\
+      if (json_object_is_type(obj, json_type_string)) {		\
+	  r = !strcmp(json_object_get_string(obj), to_cmp);	\
+      }								\
+      r;							\
+    })
+
+#define CSONPATH_EQUAL_NUM(obj, to_cmp)	({			\
+      _Bool r = 0;						\
+      if (json_object_is_type(obj, json_type_int)) {		\
+	r = json_object_get_int(obj) == to_cmp;			\
+      }								\
+      r;							\
+    })
+
+
+#ifdef __TINYC__
+#define CSONPATH_PRAGMA(...)
+#else
+#define CSONPATH_PRAGMA(...) _Pragma(__VA_ARGS__)
+#endif
+
+#define CSONPATH_ARRAY_LENGTH(o) ((size_t)json_object_array_length(o))
+
+#define CSONPATH_FOREACH_ARRAY(obj, child, idx)				\
+    CSONPATH_PRAGMA("GCC unroll 8")					\
+    for (intptr_t array_len = json_object_array_length(obj), idx = 0;	\
+	 ({int r = idx < array_len; child = json_object_array_get_idx(obj, idx); r;}); ++idx)
+
+#define CSONPATH_FOREACH_OBJ(obj, child, key)				\
+        struct lh_entry *entry##key;                                           \
+        struct lh_entry *entry_next##key = NULL;                               \
+	struct lh_table *otable = json_object_get_object(obj);		\
+        for (entry##key = otable ? otable->head : NULL;			\
+             (entry##key ? (key = (char *)lh_entry_k(entry##key),              \
+                           child = (struct json_object *)lh_entry_v(entry##key), \
+                           entry_next##key = entry##key->next, entry##key)     \
+                         : 0);                                                 \
+             entry##key = entry_next##key)
+
+
+#define CSONPATH_OBJ_CLEAR(o)						\
+  do { json_object_object_foreach(o, k, to_rm) { json_object_object_del(o,k); }  } while (0)
+
+#define CSONPATH_ARRAY_CLEAR(o)					\
+  json_object_array_del_idx(o, 0, json_object_array_length(o));
+
+
+#define CSONPATH_FOREACH_EXT(obj, el, code, key_idx_)				\
+  if (json_object_is_type(obj, json_type_object)) {			\
+    json_object_object_foreach(obj, key_idx_, el) { (void) key_idx_; code } \
+  } else if (json_object_is_type(obj, json_type_array)) {		\
+    int array_len_ = json_object_array_length(obj);			\
+    CSONPATH_PRAGMA("GCC unroll 8")					\
+    for (intptr_t key_idx_ = 0; key_idx_ < array_len_; ++key_idx_) {	\
+      el = json_object_array_get_idx(obj, key_idx_);			\
+      code								\
+	}								\
+  }
+
+#define CSONPATH_REMOVE_CHILD(obj, child_info)				\
+  if (child_info.type == CSONPATH_INTEGER) {				\
+    json_object_array_put_idx(obj, child_info.idx, NULL);		\
+  } else {								\
+    json_object_object_del(obj, child_info.key);			\
+  }
+
+#define CSONPATH_NEW_ARRAY() json_object_new_array()
+
+#define CSONPATH_NEW_OBJECT() json_object_new_object()
+
+#define CSONPATH_NEW_STR(s) json_object_new_string(s)
+
+#define CSONPATH_NEW_INT(n) json_object_new_int(n)
+
+#define CSONPATH_NEW_BOOL(b) json_object_new_boolean(b)
+
+static int json_object_try_object_add(struct json_object *obj, const char * const at,
+				      struct json_object *el, int do_incref)
+{
+    if (!CSONPATH_IS_OBJ(obj)) {
+	return -1;
+    }
+    if (do_incref) json_object_get(el);
+    json_object_object_add(obj, at, el);
+    return 1;
+}
+
+static int json_array_try_put(struct json_object *obj, int at,
+			      struct json_object *el, int do_incref)
+{
+    if (!CSONPATH_IS_ARRAY(obj)) {
+	return -1;
+    }
+    if (do_incref) json_object_get(el);
+    json_object_array_put_idx(obj, at, el);
+    return 1;
+}
+
+#define CSONPATH_APPEND_AT(array, at, el, do_incref)		\
+    _Generic((at),						\
+	     int: json_array_try_put,			\
+	     unsigned int: json_array_try_put,		\
+	     long: json_array_try_put,			\
+	     unsigned long: json_array_try_put,		\
+	     long long: json_array_try_put,		\
+	     unsigned long long: json_array_try_put,	\
+	     const char *: json_object_try_object_add,	\
+	     char *: json_object_try_object_add		\
+	) (array, at, el, do_incref)
+
+#define CSONPATH_ARRAY_APPEND(array, el) ({	\
+      json_object_get(el);			\
+      json_object_array_add(array, el);		\
+    })
+
+static struct json_object *csonpath_json_c_get(struct json_object *obj,
+					       const char *key)
+{
+  if (!json_object_is_type(obj, json_type_object))
+    return NULL;
+  return json_object_object_get(obj, key);
+}
+
+static struct json_object *csonpath_json_c_at(struct json_object *obj,
+					      int at)
+{
+  if (!json_object_is_type(obj, json_type_array))
+    return NULL;
+  return json_object_array_get_idx(obj, at);
+}
+
+
+
+#include "csonpath.h"
+
+#endif

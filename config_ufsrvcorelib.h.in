@@ -1,0 +1,49 @@
+/**
+ * Copyright (C) 2015-2026 unfacd works
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+/**
+ * @file config.h.in
+ * @brief CMake configure_file() template -- generates config.h at configure time.
+ * #Configuration defaults for items which the user did not pass value for via -D are in cmake-modules/config_defaults_definitions.cmake
+ */
+
+#ifndef CONFIG_UFSRVCORELIB_H
+#define CONFIG_UFSRVCORELIB_H
+
+#define _REENTRANT
+#ifndef _GNU_SOURCE
+# define _GNU_SOURCE
+#endif
+
+#define __UF_TESTING                            @__UF_TESTING@
+#define __UF_DEV                                @__UF_DEV@
+#define UFSRV_DEBUG_BUILD                       @UFSRV_DEBUG_BUILD@
+#define UFSRV_DEBUG_BUILD_L2                    @UFSRV_DEBUG_L2@
+#define UFSRV_DEBUG_BUILD_L3                    @UFSRV_DEBUG_L3@
+
+#define CONFIG_DEFAULT_MAX_CORES                @CONFIG_DEFAULT_MAX_CORES@
+#define CONFIG_DEFAULT_CONFIGFILE_VALIDATOR     "@CONFIG_DEFAULT_CONFIGFILE_VALIDATOR@" ///< name of lua validator script file
+#define CONFIG_DEFAULT_CONFIGFILE_CORE_SCHEMA   "@CONFIG_DEFAULT_CONFIGFILE_CORE_SCHEMA@"   ///< name of core lua config schema file
+#define CONFIG_DEFAULT_CONFIGFILE_ADJUNCT_SCHEMA "@CONFIG_DEFAULT_CONFIGFILE_ADJUNCT_SCHEMA@"   ///< name of adjunct lua config schemal file
+
+#define CONFIG_DEFAULT_UFSRV_SECRET_KEY          "@CONFIG_DEFAULT_UFSRV_SECRET_KEY@"    ///< file where secret key is saved
+#define CONFIG_DEFAULT_UFSRV_SECRET_KEY_SZ       @CONFIG_DEFAULT_UFSRV_SECRET_KEY_SZ@   ///< byte allocation size for storing secret key
+#define CONFIG_DEFAULT_UFSRV_SECRETS_DIRECTORY   "@CONFIG_DEFAULT_UFSRV_SECRETS_DIRECTORY@" ///< directory name where secret key is stored (assumed relative to /opt/xxx/)
+
+#include "config_defs_ufsrvcorelib.h"
+
+#endif /* CONFIG_UFSRVCORELIB_H */

@@ -1,0 +1,933 @@
+/**
+ * @file ufsrv_config_generator_fields.c.input
+ * @brief Cold catalogue — core ufsrv config and runtime field descriptors.
+ *
+ * Copyright (C) 2015-2026 unfacd works
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This file is consumed by ufsrv_config_generator via #include.
+ * It is NOT compiled into the server binary.
+ *
+ * This file decomposes the 'struct ufsrv' into into individual composeable
+ * constructs which are composed into two repositories of settable/gettable
+ * hot data stores:
+ *  extern UfsrvConfigValue ufsrv_config_store[UFSRV_CONFIG_FIELD_COUNT];
+ *  extern void *ufsrv_runtime_store[UFSRV_RUNTIME_FIELD_COUNT];
+ * This facilitates the layering of runtime config symbols (config file + runtime config types): ufsrv + ufsrvwebsock etc...
+ * as the monoloth blends them into one repository with standard interface.
+ * See the generated file: ufsrv_config_generated.h
+ * Valules marshallled via config file origin can have optional validation rules applied to them.
+ * the config file key is used to wire in an adapter function that transforms the config-file stored value to actual c type stored by the config table.
+ * in lua: cpu affinity might bestored as: "system_override" in config tabler that's: enum CpuAffinityPolicy
+ *
+ * Adding a field — worked example: the logger block:
+ *   1. Lua schema: key block in etc/core_schema_ufsrv.lua (types, defaults, ranges).
+ *   2. Literal (CONFIG only): CONF_FILE_LITERAL_<GROUP>_<KEY> in ufsrv_config_literals_defs.h.
+ *        #define CONF_FILE_LITERAL_LOGGER_DRIVER  "logger.driver"
+ *   3. Symbol (CONFIG only and only at server end which is the real consumer): one line in data_config_symbols_core_priv.h with the same key,
+ *      .type matching the value type, .field_index = UFSRV_CONFIG_FIELD_COUNT (resolved by name).
+ *   4. Catalogue: one entry in core_fields[] below. Copy the nearest entry of the same type:
+ *        int / size_t / char *     generic lifecycle (GenericInt* / GenericStr*), no hand-written code.
+ *        char *                    .type_allocation_sz = buffer incl NUL (paths 1024, formats 4096).
+ *        struct / enum / pointer   plus a marshaller UfsrvConfig<Name>AsString_<type> in
+ *                                  ufsrv_config_stubs_as_string.c (+ decl in ..._priv.h); the generated
+ *                                  accessor delegates to it (UfLogger * -> UfLoggerDescribeConfiguration).
+ *        pointer fields            .value_type = UFSRV_CONFIG_VALUE_PTR, .on_teardown = NULL when the
+ *                                  handle belongs to the consumer, not the config store.
+ *   5. Regenerate + install: ufsrv_config_generate -> ufsrv_config_verify_generated -> ufsrv_config_install.
+ *      install rewrites include/.../generated/ and src/.../generated/ and git-adds them; never hand-edit those.
+ *   6. Default: .stored_value = { ... } feeds the add-defaults bootstrap pass and the generated read-only
+ *      defaults table for both domains.
+ *
+ * Removing a field:
+ *   1. Drop the core_fields[] entry, its literal, its symbol line and the Lua key.
+ *   2. Regenerate + install.  Fix consumers of the old accessor.
+ */
+// @version 64
+// @sha     230f5576d045ec937ddf358928b972cbd2b0f89e
+
+//These help the generator compile
+#include <netinet/in.h>
+#include <lua.h>
+
+#include <ufsrvcorelib/ufsrv_core/ufsrv_config/ufsrv_config_field_descriptor.h>
+#include <ufsrvcorelib/ufsrv_core/ufsrv_config/ufsrv_config_store_operating_state_enum.h>
+#include <ufsrvcorelib/ufsrv_core/ufsrv_config/ufsrv_config_types.h>
+#include <ufsrvcorelib/ufsrv_core/system/server_run_mode_enum.h>
+#include <ufsrvcorelib/ufsrv_core/system/server_process_mode_enum.h>
+#include <ufsrvcorelib/ufsrv_core/system/ufsrv_thread_cpu_affinity_descriptor_type.h>
+#include <uflib/collection_descriptor_type.h>
+
+typedef struct UFSRVResult UFSRVResult;
+
+/*
+IMPORTANT: YOU MUST ENSURE NAMING ALIGNMENT BETWEEN:
+ *  1) static array entries in file 'config_symbols_core.c',
+ *  2) literals in file 'ufsrv_config_literals_defs.h'
+ *  3) lua schema file 'core_schema_ufsrv.lua'
+ *  4) in ufsrv_config input files: 'ufsrv_config_generator_fields.c.input', where config items have a corresponding lua config item (key)
+*/
+static const UfsrvConfigFieldDescriptorForGenerator core_fields[] = {
+
+    {
+        .name            = "conf_file_store_operating_state",
+        .value_type      = UFSRV_CONFIG_VALUE_INT,
+        .c_lang_type     = "enum UfsrvConfigStoreOperatingState",
+        .domain          = UFSRV_CONFIG_DOMAIN_RUNTIME,
+        .config_field_default    = { .config = { .stored_value = { .int_val = UFSRV_CONFIG_STORE_OPERATING_STATE_BOOTED } } },
+        .lifecycle = { .on_inflated = "GenericIntInflator", .on_value_available = "GenericIntSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = NULL},
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = "runtime_store_operating_state",
+        .value_type      = UFSRV_CONFIG_VALUE_INT,
+        .c_lang_type     = "enum UfsrvConfigStoreOperatingState",
+        .domain          = UFSRV_CONFIG_DOMAIN_RUNTIME,
+        .config_field_default    = { .config = { .stored_value = { .int_val = UFSRV_CONFIG_STORE_OPERATING_STATE_BOOTED } } },
+        .lifecycle = { .on_inflated = "GenericIntInflator", .on_value_available = "GenericIntSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = NULL },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = "ufsrv_secret_key",
+        .value_type      = UFSRV_CONFIG_VALUE_STRUCT,
+        .c_lang_type     = "unsigned char", //supports unsigned char[32] and use UfsrvConfigUfsrvSecretKeyAsPtr()
+        .domain          = UFSRV_CONFIG_DOMAIN_RUNTIME,
+        .config_field_default    = { .config = { .stored_value = { }, .type_allocation_sz = 32 } },// SECRET_KEY_BYTES
+        .lifecycle = { .on_inflated = "GenericStructInflator", .on_value_available = "GenericStructSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = "GenericStructTeardown" },
+        .is_as_ptr_getter = true,
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = "ufsrv_secret_key_store",
+        .value_type      = UFSRV_CONFIG_VALUE_STR,
+        .c_lang_type     = "char *",
+        .domain          = UFSRV_CONFIG_DOMAIN_RUNTIME,
+        .config_field_default    = { .config = { .stored_value = { .str_val = "/opt/ufsrv/etc/secrets/ufsrv_secret_key" }, .type_allocation_sz = 128 } },//SBUF
+        .lifecycle = { .on_inflated = "GenericStrInflator", .on_value_available = "GenericStrSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = "GenericStrTeardown" },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = "serverid_runtime_random",
+        .value_type      = UFSRV_CONFIG_VALUE_INT,
+        .c_lang_type     = "unsigned",
+        .domain          = UFSRV_CONFIG_DOMAIN_RUNTIME,
+        .config_field_default    = { .config = { .stored_value = { .int_val = 0 } } },
+        .lifecycle = { .on_inflated = "GenericIntInflator", .on_value_available = "GenericIntSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = NULL },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = "server_instance_id",
+        .config_file_key = CONF_FILE_LITERAL_SERVER_INSTANCE_ID,
+        .value_type      = UFSRV_CONFIG_VALUE_INT,
+        .c_lang_type     = "int",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .stored_value = { .int_val = 1 } } },
+        .lifecycle = { .on_inflated = "GenericIntInflator", .on_value_available = "GenericIntSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = NULL },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = "serverpid",
+        .value_type      = UFSRV_CONFIG_VALUE_INT,
+        .c_lang_type     = "pid_t",
+        .domain          = UFSRV_CONFIG_DOMAIN_RUNTIME,
+        .config_field_default    = { .config = { .stored_value = { .int_val = 0 } } },
+        .lifecycle = { .on_inflated = "GenericIntInflator", .on_value_available = "GenericIntSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = NULL },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = "server_class",
+        .value_type      = UFSRV_CONFIG_VALUE_STR,
+        .c_lang_type     = "char *",
+        .domain          = UFSRV_CONFIG_DOMAIN_RUNTIME,
+        .config_field_default    = { .config = { .stored_value = { .str_val = "ufsrvwebsock" }, .type_allocation_sz = 64 } }, //MINIBUF
+        .lifecycle = { .on_inflated = "GenericStrInflator", .on_value_available = "GenericStrSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = "GenericStrTeardown" },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = "server_descriptive_name",
+        .value_type      = UFSRV_CONFIG_VALUE_STR,
+        .c_lang_type     = "char *",
+        .domain          = UFSRV_CONFIG_DOMAIN_RUNTIME,
+        .config_field_default    = { .config = {  .type_allocation_sz = 129 } },    //MEDIUMBUF + 1
+        .lifecycle = { .on_inflated = "GenericStrInflator", .on_value_available = "GenericStrSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = "GenericStrTeardown" },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = "ufsrv_geogroup",
+        .value_type      = UFSRV_CONFIG_VALUE_INT,
+        .config_file_key = CONF_FILE_LITERAL_UFSRV_GEOGROUP,
+        .c_lang_type     = "int",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .stored_value = { .int_val = 0 } } },
+        .lifecycle = { .on_inflated = "GenericIntInflator", .on_value_available = "GenericIntSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = NULL },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = "when",
+        .value_type      = UFSRV_CONFIG_VALUE_INT,
+        .c_lang_type     = "time_t",
+        .domain          = UFSRV_CONFIG_DOMAIN_RUNTIME,
+        .config_field_default    = { .config = { .stored_value = { .int_val = 0 } } },
+        .lifecycle = { .on_inflated = "GenericIntInflator", .on_value_available = "GenericIntSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = NULL },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = "ufsrv_time",
+        .value_type      = UFSRV_CONFIG_VALUE_STRUCT,
+        .c_lang_type     = "struct timeval",
+        .domain          = UFSRV_CONFIG_DOMAIN_RUNTIME,
+        .config_field_default    = { .config = { .type_allocation_sz = sizeof(struct timeval) } },
+        .lifecycle = { .on_inflated = "GenericStructInflator", .on_value_available = "GenericStructSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = "GenericStructTeardown" },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+        .is_as_ptr_getter = true,
+        // NOTE: struct timeval.  Accessor must be hand-refined.
+    },
+    {
+        .name            = "server_process_mode", //legacy ufsrv.running_mode
+        .value_type      = UFSRV_CONFIG_VALUE_ENUM,
+        .c_lang_type     = "enum ServerProcessMode",
+        .domain          = UFSRV_CONFIG_DOMAIN_RUNTIME,
+        .config_field_default    = { .config = { .stored_value = { .int_val = SERVER_PROCESS_MODE_TERMINAL } } },
+        .lifecycle = { .on_inflated = "GenericIntInflator", .on_value_available = "GenericIntSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = NULL },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = "server_run_mode",
+        .value_type      = UFSRV_CONFIG_VALUE_ENUM,
+        .config_file_key = CONF_FILE_LITERAL_SERVER_RUN_MODE,
+        .c_lang_type     = "enum ServerRunMode",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .stored_value = { .int_val = RUNMODE_NORMAL } } },
+        .lifecycle = { .on_inflated = "GenericIntInflator", .on_value_available = "GenericIntSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = NULL },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_ENUM_RANGE },
+    },
+    {
+        .name            = "log_mode",
+        .value_type      = UFSRV_CONFIG_VALUE_ENUM,
+        .c_lang_type     = "unsigned",
+        .domain          = UFSRV_CONFIG_DOMAIN_RUNTIME,
+        .config_field_default    = { .config = { .stored_value = { .int_val = 0 } } },
+        .lifecycle = { .on_inflated = "GenericIntInflator", .on_value_available = "GenericIntSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = NULL },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = "ssl_support",
+        .value_type      = UFSRV_CONFIG_VALUE_INT,
+        .c_lang_type     = "unsigned",
+        .domain          = UFSRV_CONFIG_DOMAIN_RUNTIME,
+        .config_field_default    = { .config = { .stored_value = { .int_val = 0 } } },
+        .lifecycle = { .on_inflated = "GenericIntInflator", .on_value_available = "GenericIntSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = NULL },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+
+    // Network listeners
+    {
+        .name            = "main_listener_port",
+        .value_type      = UFSRV_CONFIG_VALUE_INT,
+        .config_file_key = CONF_FILE_LITERAL_MAIN_LISTENER_PORT,
+        .c_lang_type     = "int",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .stored_value = { .int_val = 19701 } } },
+        .lifecycle = { .on_inflated = "GenericIntInflator", .on_value_available = "GenericIntSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = NULL },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_RANGE, .check = { .range = {1, 65535} } },
+    },
+    {
+        .name            = "main_listener_address",
+        .value_type      = UFSRV_CONFIG_VALUE_STR,
+        .config_file_key = CONF_FILE_LITERAL_MAIN_LISTENER_ADDRESS,
+        .c_lang_type     = "char *",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .stored_value = { .str_val = "127.0.0.1" }, .type_allocation_sz = 257 } }, //MBUF + nil
+        .lifecycle = { .on_inflated = "GenericStrInflator", .on_value_available = "GenericStrSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = "GenericStrTeardown" },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = "main_listener_protocol_id",
+        .value_type      = UFSRV_CONFIG_VALUE_INT,
+        .config_file_key = CONF_FILE_LITERAL_MAIN_LISTENER_PROTOCOL_ID,
+        .c_lang_type     = "unsigned",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .stored_value = { .int_val = 1 } } },
+        .lifecycle = { .on_inflated = "GenericIntInflator", .on_value_available = "GenericIntSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = NULL },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = "command_console_port",
+        .value_type      = UFSRV_CONFIG_VALUE_INT,
+        .config_file_key = CONF_FILE_LITERAL_COMMAND_CONSOLE_PORT,
+        .c_lang_type     = "int",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .is_as_ptr_getter = true,
+        .config_field_default    = { .config = { .stored_value = { .int_val = 19700 } } },
+        .lifecycle = { .on_inflated = "GenericIntInflator", .on_value_available = "GenericIntSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = NULL },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_RANGE, .check = { .range = {1, 65535} } },
+    },
+    {
+        .name            = "command_console_address",
+        .value_type      = UFSRV_CONFIG_VALUE_STR,
+        .config_file_key = CONF_FILE_LITERAL_COMMAND_CONSOLE_BIND_ADDRESS,
+        .c_lang_type     = "char *",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .stored_value = { .str_val = "127.0.0.1" }, .type_allocation_sz = 257 } }, //+ nil
+        .lifecycle = { .on_inflated = "GenericStrInflator", .on_value_available = "GenericStrSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = "GenericStrTeardown" },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+
+    // File paths
+    {
+        .name            = "config_dir",
+        .value_type      = UFSRV_CONFIG_VALUE_STR,
+        .c_lang_type     = "char *",
+        .domain          = UFSRV_CONFIG_DOMAIN_RUNTIME,
+        .config_field_default    = { .config = { .stored_value = { .str_val = "/opt/ufsrv" }, .type_allocation_sz = 257 } }, //_POSIX_PATH_MAX + nil
+        .lifecycle = { .on_inflated = "GenericStrInflator", .on_value_available = "GenericStrSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = "GenericStrTeardown" },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = "config_file",
+        .value_type      = UFSRV_CONFIG_VALUE_STR,
+        .c_lang_type     = "char *",
+        .domain          = UFSRV_CONFIG_DOMAIN_RUNTIME,
+        .config_field_default    = { .config = { .stored_value = { .str_val = "ufsrv.config.lua" }, .type_allocation_sz = 257 } }, //_POSIX_PATH_MAX + nil
+        .lifecycle = { .on_inflated = "GenericStrInflator", .on_value_available = "GenericStrSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = "GenericStrTeardown" },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+
+    // CPU affinity
+    {
+        .name            = "server_cpu_affinity",
+        .value_type      = UFSRV_CONFIG_VALUE_ENUM,
+        .config_file_key = CONF_FILE_LITERAL_SERVER_CPU_AFFINITY,
+        .c_lang_type     = "enum CpuAffinityPolicy",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .stored_value = { .int_val = CPU_AFFINITY_SYSTEM_OVERRIDE } } }, //enum CpuAffinityPolicy
+        .lifecycle = { .on_inflated = "GenericIntInflator", .on_value_available = "GenericIntSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = NULL },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_ENUM_RANGE },
+    },
+
+    // Runtime: Lua state (wired at init, not config-file-driven)
+    {
+        .name            = "lua_handle",
+        .value_type      = UFSRV_CONFIG_VALUE_PTR, //allocated by host app
+        .c_lang_type     = "lua_State *",
+        .domain          = UFSRV_CONFIG_DOMAIN_RUNTIME,
+        .config_field_default    = { .config = { .stored_value = { .ptr_val = 0 } } },
+        .lifecycle = { .on_inflated = NULL, .on_value_available = "GenericPtrSetter", .on_value_reloaded = NULL, .on_teardown = NULL },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+
+    {
+        .name            = "instrumentation_backend",
+        .value_type      = UFSRV_CONFIG_VALUE_PTR, //allocated by host app
+        .c_lang_type     = "InstrumentationBackend *",
+        .domain          = UFSRV_CONFIG_DOMAIN_RUNTIME,
+        .config_field_default    = { .config = {  } }, //todo port InstrumentationBackend header sizeof(InstrumentationBackend) = 132
+        .lifecycle = { .on_inflated = NULL, .on_value_available = "GenericPtrSetter", .on_value_reloaded = NULL, .on_teardown = NULL },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = "instrumentation_backend_server",
+        .value_type      = UFSRV_CONFIG_VALUE_STRUCT,  /* STRUCT — hand-refine accessor */
+        .c_lang_type     = "struct sockaddr_in",
+        .domain          = UFSRV_CONFIG_DOMAIN_RUNTIME,
+        .is_as_ptr_getter = true,
+        .config_field_default    = { .config = { .type_allocation_sz = sizeof(struct sockaddr_in) } },
+        .lifecycle         = { .on_inflated = "GenericStructInflator", .on_value_available = "GenericStructSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = "GenericStructTeardown" },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+        // NOTE: struct sockaddr_in.  Accessor must be hand-refined.
+    },
+    // Runtime: IPC — sessions delegator and work pipe
+    {
+        .name            = "sessions_delegator",
+        .value_type      = UFSRV_CONFIG_VALUE_PTR, //allocated by host app
+        .c_lang_type     = "SessionsDelegator *",
+        .domain          = UFSRV_CONFIG_DOMAIN_RUNTIME,
+        .config_field_default    = { .config = { } }, //todo oversize bytes: port InstrumentationBackend header SessionsDelegator
+        .lifecycle = { .on_inflated = NULL, .on_value_available = "GenericPtrSetter", .on_value_reloaded = NULL, .on_teardown = NULL },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = "work_delegator_pipe",
+        .value_type      = UFSRV_CONFIG_VALUE_PTR, //allocated by host
+        .c_lang_type     = "InstanceHolderForSession *", //todo oversize bytes: port InstrumentationBackend header InstanceHolderForSession
+        .domain          = UFSRV_CONFIG_DOMAIN_RUNTIME,
+        .config_field_default    = { .config = {  } },
+        .is_as_ptr_getter = true,
+        .lifecycle = { .on_inflated = NULL, .on_value_available = "GenericPtrSetter", .on_value_reloaded = NULL, .on_teardown = NULL },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = "pipefds",
+        .value_type      = UFSRV_CONFIG_VALUE_STRUCT, //pre-allocated by on_inflated
+        .c_lang_type     = "int *",
+        .domain          = UFSRV_CONFIG_DOMAIN_RUNTIME,
+        .config_field_default    = { .config = { .type_allocation_sz = 8 } }, //8 bytes int pipefds[2];
+        .lifecycle = { .on_inflated = "GenericStructInflator", .on_value_available = "GenericStructSetter", .on_value_reloaded = NULL, .on_teardown = NULL },
+        .is_keep_custom_getter = true, //definition in ufsrv_config_stubs_accessor_defs.c
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+        // NOTE: int[2] array.  Read-only after pipe() call.
+    },
+    {
+        .name            = "ssl_command_console",
+        .value_type      = UFSRV_CONFIG_VALUE_PTR,
+        .c_lang_type     = "SSL *",
+        .domain          = UFSRV_CONFIG_DOMAIN_RUNTIME,
+        .config_field_default    = { .config = {  } },
+        .lifecycle = { .on_inflated = NULL, .on_value_available = "GenericPtrSetter", .on_value_reloaded = NULL, .on_teardown = NULL},
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = "ssl_command_console_key_file",
+        .value_type      = UFSRV_CONFIG_VALUE_STR,
+        .config_file_key = CONF_FILE_LITERAL_SSL_COMMAND_CONSOLE_KEY_FILE,
+        .c_lang_type     = "char *",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .stored_value = { .str_val = "ufsrv_console_ssl.key" }, .type_allocation_sz = 257 } }, //_POSIX_PATH_MAX + nil
+        .lifecycle = { .on_inflated = "GenericStrInflator", .on_value_available = "GenericStrSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = "GenericStrTeardown" },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = "ssl_command_console_certificate_file",
+        .config_file_key = CONF_FILE_LITERAL_SSL_COMMAND_CONSOLE_CERTIFICATE_FILE,
+        .value_type      = UFSRV_CONFIG_VALUE_STR,
+        .c_lang_type     = "char *",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .stored_value = { .str_val = "ufsrv_console_certificate.pem" }, .type_allocation_sz = 257 } }, //_POSIX_PATH_MAX + nil
+        .lifecycle = { .on_inflated = "GenericStrInflator", .on_value_available = "GenericStrSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = "GenericStrTeardown" },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = "ssl_command_console_is_enabled",
+        .config_file_key = CONF_FILE_LITERAL_SSL_COMMAND_CONSOLE_IS_ENABLED,
+        .value_type      = UFSRV_CONFIG_VALUE_BOOL,
+        .c_lang_type     = "bool",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .stored_value = { .int_val = false } } },
+        .lifecycle = { .on_inflated = "GenericBoolInflator", .on_value_available = "GenericBoolSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = NULL },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = "ssl_command_console_allow_list_god",
+        .config_file_key = CONF_FILE_LITERAL_SSL_COMMAND_CONSOLE_ALLOW_LIST_GOD,
+        .value_type      = UFSRV_CONFIG_VALUE_STRUCT,
+        .c_lang_type     = "DistinctArray",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .type_allocation_sz = sizeof(DistinctArray) } },
+        .lifecycle = { .on_inflated = "GenericStructInflator", .on_value_available = NULL, .on_value_reloaded = "GenericReloadedStub", .on_teardown = "GenericStructTeardown" },
+        .is_keep_custom_setter = true, //where this is set, .on_value_available should be unset. The generator emits an extern UfsrvConfigSet<Name>() declaration plus a generated lifecycle bridge UfsrvConfig<Name>Setter() which it wires into the field table's .on_value_available
+        .is_as_ptr_getter = true,
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = "ssl_command_console_allow_list_browser",
+        .config_file_key = CONF_FILE_LITERAL_SSL_COMMAND_CONSOLE_ALLOW_LIST_BROWSER,
+        .value_type      = UFSRV_CONFIG_VALUE_STRUCT,
+        .c_lang_type     = "DistinctArray",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .type_allocation_sz = sizeof(DistinctArray) } },
+        .lifecycle = { .on_inflated = "GenericStructInflator", .on_value_available = NULL, .on_value_reloaded = "GenericReloadedStub", .on_teardown = "GenericStructTeardown" },
+        .is_keep_custom_setter = true, //where this is set, .on_value_available should be unset. The generator emits an extern UfsrvConfigSet<Name>() declaration plus a generated lifecycle bridge UfsrvConfig<Name>Setter() which it wires into the field table's .on_value_available
+        .is_as_ptr_getter = true,
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+     {
+        .name            = "ssl_command_console_deny_list",
+        .config_file_key = CONF_FILE_LITERAL_SSL_COMMAND_CONSOLE_DENY_LIST,
+        .value_type      = UFSRV_CONFIG_VALUE_STRUCT,
+        .c_lang_type     = "DistinctArray",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .type_allocation_sz = sizeof(DistinctArray) } }, 
+        .lifecycle = { .on_inflated = "GenericStructInflator", .on_value_available = NULL, .on_value_reloaded = "GenericReloadedStub", .on_teardown = "GenericStructTeardown" },
+        .is_keep_custom_setter = true, //where this is set, .on_value_available should be unset. The generator emits an extern UfsrvConfigSet<Name>() declaration plus a generated lifecycle bridge UfsrvConfig<Name>Setter() which it wires into the field table's .on_value_available
+        .is_as_ptr_getter = true,
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = "ssl_command_console_client_key_file",
+        .value_type      = UFSRV_CONFIG_VALUE_STR,
+        .config_file_key = CONF_FILE_LITERAL_SSL_COMMAND_CONSOLE_CLIENT_KEY_FILE,
+        .c_lang_type     = "char *",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .stored_value = { .str_val = "ufsrv_console_client_ssl.key" }, .type_allocation_sz = 257 } }, //_POSIX_PATH_MAX + nil
+        .lifecycle = { .on_inflated = "GenericStrInflator", .on_value_available = "GenericStrSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = "GenericStrTeardown" },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = "ssl_command_console_client_certificate_file",
+        .config_file_key = CONF_FILE_LITERAL_SSL_COMMAND_CONSOLE_CLIENT_CERTIFICATE_FILE,
+        .value_type      = UFSRV_CONFIG_VALUE_STR,
+        .c_lang_type     = "char *",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .stored_value = { .str_val = "ufsrv_console_client_certificate.pem" }, .type_allocation_sz = 257 } }, //_POSIX_PATH_MAX + nil
+        .lifecycle = { .on_inflated = "GenericStrInflator", .on_value_available = "GenericStrSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = "GenericStrTeardown" },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = "ssl_command_console_client_is_enabled",
+        .config_file_key = CONF_FILE_LITERAL_SSL_COMMAND_CONSOLE_CLIENT_IS_ENABLED,
+        .value_type      = UFSRV_CONFIG_VALUE_BOOL,
+        .c_lang_type     = "bool",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .stored_value = { .int_val = false } } },
+        .lifecycle = { .on_inflated = "GenericBoolInflator", .on_value_available = "GenericBoolSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = NULL },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+     {
+        .name            = "ssl_console_is_client_certificate_required",
+        .config_file_key = CONF_FILE_LITERAL_SSL_COMMAND_CONSOLE_IS_CLIENT_CERTIFICATE_REQUIRED,
+        .value_type      = UFSRV_CONFIG_VALUE_BOOL,
+        .c_lang_type     = "bool",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .stored_value = { .int_val = false }  } },
+        .lifecycle = { .on_inflated = "GenericBoolInflator", .on_value_available = "GenericBoolSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = NULL },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    // Runtime: SSL contexts (wired at init, need teardown)
+    {
+        .name            = "ssl_ctx",
+        .value_type      = UFSRV_CONFIG_VALUE_PTR,
+        .c_lang_type     = "SSL_CTX *",
+        .domain          = UFSRV_CONFIG_DOMAIN_RUNTIME,
+        .config_field_default    = { .config = {  } },
+        .lifecycle = { .on_inflated = NULL, .on_value_available = "GenericPtrSetter", .on_value_reloaded = NULL, .on_teardown = NULL},
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = "ssl_user_ctx",
+        .value_type      = UFSRV_CONFIG_VALUE_PTR,
+        .c_lang_type     = "SSL_CTX *",
+        .domain          = UFSRV_CONFIG_DOMAIN_RUNTIME,
+        .config_field_default    = { .config = {  } },
+        .lifecycle = { .on_inflated = NULL, .on_value_available = "GenericPtrSetter", .on_value_reloaded = NULL, .on_teardown = NULL },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = "ssl_mutexes",
+        .value_type      = UFSRV_CONFIG_VALUE_PTR,
+        .c_lang_type     = "pthread_mutex_t *",
+        .domain          = UFSRV_CONFIG_DOMAIN_RUNTIME,
+        .config_field_default    = { .config = {  } },
+        .lifecycle = { .on_inflated = NULL, .on_value_available = "GenericPtrSetter", .on_value_reloaded = NULL, .on_teardown = NULL },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = "thread_handle_timer_delegator",
+        .value_type      = UFSRV_CONFIG_VALUE_STRUCT,
+        .c_lang_type     = "pthread_t",
+        .domain          = UFSRV_CONFIG_DOMAIN_RUNTIME,
+        .config_field_default    = { .config = {  .type_allocation_sz =  sizeof(pthread_t)} },
+        .lifecycle = { .on_inflated = "GenericStructInflator", .on_value_available = "GenericStructSetter", .on_value_reloaded = NULL, .on_teardown = "GenericStructTeardown"},
+        .is_as_ptr_getter = true,
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+        // NOTE: struct { pthread_t thread; }.  Accessor must be hand-refined.
+    },
+    {
+        .name            = "fileloader_enabled",
+        .config_file_key = CONF_FILE_LITERAL_FILELOADER_ENABLED,
+        .value_type      = UFSRV_CONFIG_VALUE_INT,
+        .c_lang_type     = "int",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .stored_value = { .int_val = 1 } } },
+        .lifecycle = { .on_inflated = "GenericIntInflator", .on_value_available = "GenericIntSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = NULL },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = "fileloader_registry_size",
+        .config_file_key = CONF_FILE_LITERAL_FILELOADER_REGISTRY_SIZE,
+        .value_type      = UFSRV_CONFIG_VALUE_INT,
+        .c_lang_type     = "size_t",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .stored_value = { .int_val = 128 } } },
+        .lifecycle = { .on_inflated = "GenericIntInflator", .on_value_available = "GenericIntSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = NULL },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = "fileloader_registry_hot_loaded_size",
+        .config_file_key = CONF_FILE_LITERAL_FILELOADER_REGISTRY_HOT_LOADED_SIZE,
+        .value_type      = UFSRV_CONFIG_VALUE_INT,
+        .c_lang_type     = "size_t",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .stored_value = { .int_val = 64 } } },
+        .lifecycle = { .on_inflated = "GenericIntInflator", .on_value_available = "GenericIntSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = NULL },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = "fileloader_black_listed_files_registry",
+        .config_file_key = CONF_FILE_LITERAL_FILELOADER_BLACK_LISTED_FILES_REGISTRY,
+        .value_type      = UFSRV_CONFIG_VALUE_STRUCT,
+        .c_lang_type     = "CollectionDescriptor",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .type_allocation_sz = sizeof(CollectionDescriptor) } },
+        .lifecycle = { .on_inflated = "GenericStructInflator", .on_value_available = NULL, .on_value_reloaded = "GenericReloadedStub", .on_teardown = "GenericStructTeardown" },
+        .is_keep_custom_setter = true, //where this is set, .on_value_available should be unset. The generator emits an extern UfsrvConfigSet<Name>() declaration plus a generated lifecycle bridge UfsrvConfig<Name>Setter() which it wires into the field table's .on_value_available
+        .is_as_ptr_getter = true,
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = "fileloader_files_registry",
+        .config_file_key = CONF_FILE_LITERAL_FILELOADER_FILES_REGISTRY,
+        .value_type      = UFSRV_CONFIG_VALUE_STRUCT,
+        .c_lang_type     = "CollectionDescriptor",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .type_allocation_sz = sizeof(CollectionDescriptor) } },
+        .lifecycle = { .on_inflated = "GenericStructInflator", .on_value_available = NULL, .on_value_reloaded = "GenericReloadedStub", .on_teardown = "GenericStructTeardown" },
+        .is_keep_custom_setter = true,
+        .is_as_ptr_getter = true,
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = "file_loader_service",
+        .value_type      = UFSRV_CONFIG_VALUE_STRUCT,
+        .c_lang_type     = "FileLoaderServiceDescriptor",
+        .domain          = UFSRV_CONFIG_DOMAIN_RUNTIME,
+        .config_field_default    = { .config = { .type_allocation_sz = sizeof(FileLoaderServiceDescriptor)  } },
+        .lifecycle       = { .on_inflated = "GenericStructInflator", .on_value_available = "GenericStructSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = "GenericStructTeardown" },
+        .is_as_ptr_getter = true,
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+
+    {
+        .name            = CONF_FILE_LITERAL_LISTENER_WORKERS_THREAD_POOL,
+        .config_file_key = CONF_FILE_LITERAL_LISTENER_WORKERS_THREAD_POOL,
+        .value_type      = UFSRV_CONFIG_VALUE_INT,
+        .c_lang_type     = "size_t",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .stored_value = { .int_val = 1 } } },
+        .lifecycle = { .on_inflated = "GenericIntInflator", .on_value_available = "GenericIntSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = NULL },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = CONF_FILE_LITERAL_UFSRV_WORKERS_THREAD_POOL,
+        .config_file_key = CONF_FILE_LITERAL_UFSRV_WORKERS_THREAD_POOL,
+        .value_type      = UFSRV_CONFIG_VALUE_INT,
+        .c_lang_type     = "size_t",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .stored_value = { .int_val = 2 } } },
+        .lifecycle = { .on_inflated = "GenericIntInflator", .on_value_available = "GenericIntSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = NULL },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = CONF_FILE_LITERAL_SESSION_WORKERS_THREAD_POOL,
+        .config_file_key = CONF_FILE_LITERAL_SESSION_WORKERS_THREAD_POOL,
+        .value_type      = UFSRV_CONFIG_VALUE_INT,
+        .c_lang_type     = "size_t",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .stored_value = { .int_val = 2 } } },
+        .lifecycle = { .on_inflated = "GenericIntInflator", .on_value_available = "GenericIntSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = NULL },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = "memory_specs_sessions_per_allocation_group", //memory_specs_for_session.sessions_per_allocation_group
+        .config_file_key = CONF_FILE_LITERAL_MEMORY_SPECS_SESSIONS_PER_ALLOC_GROUP,
+        .value_type      = UFSRV_CONFIG_VALUE_INT,
+        .c_lang_type     = "size_t",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .stored_value = { .int_val = 1024 } } },    //_MEMSPECS_SESSION_ALLOCGROUP_SZ	1024
+        .lifecycle = { .on_inflated = "GenericIntInflator", .on_value_available = "GenericIntSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = NULL },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+        // NOTE: struct { allocation_groups, allocation_group_sz, allocation_trigger_threshold }
+    },
+    {
+        .name            = "memory_specs_allocation_groups", //memory_specs_for_session.allocation_groups
+        .config_file_key = CONF_FILE_LITERAL_MEMORY_SPECS_ALLOCATION_GROUPS,
+        .value_type      = UFSRV_CONFIG_VALUE_INT,
+        .c_lang_type     = "size_t",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .stored_value = { .int_val = 10 } } },    //_MEMSPECS_SESSION_ALLOCGROUPS 10
+        .lifecycle = { .on_inflated = "GenericIntInflator", .on_value_available = "GenericIntSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = NULL },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+        // NOTE: struct { allocation_groups, allocation_group_sz, allocation_trigger_threshold }
+    },
+    {
+        .name            = "memory_specs_allocation_threshold_trigger", //memory_specs_for_session.allocation_threshold_trigger
+        .config_file_key = CONF_FILE_LITERAL_MEMORY_SPECS_ALLOCATION_THRESHOLD,
+        .value_type      = UFSRV_CONFIG_VALUE_STR,  /* STRUCT — hand-refine accessor */
+        .c_lang_type     = "char *",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .stored_value = { .str_val = "10%" }, .type_allocation_sz = 5 } }, //5 bytes sizeof("100%") _MEMSPECS_SESSION_ALLOC_TRIGGER_THRESHOLD	"10%"
+        .lifecycle = { .on_inflated = "GenericStrInflator", .on_value_available = "GenericStrSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = "GenericStrTeardown" },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+        // NOTE: struct { allocation_groups, allocation_group_sz, allocation_trigger_threshold }
+    },
+    {
+        .name            = "stats_backend_address",
+        .config_file_key = CONF_FILE_LITERAL_STATS_BACKEND_ADDRESS,
+        .value_type      = UFSRV_CONFIG_VALUE_STR,  /* CONF_FILE_LITERAL_STATS_BACKEND_ADDRESS */
+        .c_lang_type     = "char *",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .stored_value = { .str_val = "127.0.0.1" }, .type_allocation_sz = 129 } }, //SBUF + nill
+        .lifecycle = { .on_inflated = "GenericStrInflator", .on_value_available = "GenericStrSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = "GenericStrTeardown" },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = "stats_backend_port",
+        .config_file_key = CONF_FILE_LITERAL_STATS_BACKEND_PORT,
+        .value_type      = UFSRV_CONFIG_VALUE_INT,  /* CONF_FILE_LITERAL_STATS_BACKEND_ADDRESS */
+        .c_lang_type     = "unsigned",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .stored_value = { .int_val = 8125 } } },
+        .lifecycle       = { .on_inflated = "GenericIntInflator", .on_value_available = "GenericIntSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = NULL },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_RANGE, .check = { .range = {1, 65535} } },
+    },
+    {
+        .name            = "user_timeouts_unauthenticated_timeout",
+        .config_file_key = CONF_FILE_LITERAL_USER_TIMEOUTS_UNAUTHENTICATED_TIMEOUT,
+        .value_type      = UFSRV_CONFIG_VALUE_INT,
+        .c_lang_type     = "size_t",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .stored_value = { .int_val = 60} } },//seconds
+        .lifecycle       = { .on_inflated = "GenericIntInflator", .on_value_available = "GenericIntSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = NULL },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = "user_timeouts_connected_timeout",
+        .config_file_key = CONF_FILE_LITERAL_USER_TIMEOUTS_CONNECTED_TIMEOUT,
+        .value_type      = UFSRV_CONFIG_VALUE_INT,
+        .c_lang_type     = "size_t",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .stored_value = { .int_val = 120 } } },//seconds
+        .lifecycle       = { .on_inflated = "GenericIntInflator", .on_value_available = "GenericIntSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = NULL },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = "user_timeouts_suspended_timeout",
+        .config_file_key = CONF_FILE_LITERAL_USER_TIMEOUTS_SUSPENDED_TIMEOUT,
+        .value_type      = UFSRV_CONFIG_VALUE_INT,
+        .c_lang_type     = "size_t",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .stored_value = { .int_val = 60 } } },//seconds
+        .lifecycle       = { .on_inflated = "GenericIntInflator", .on_value_available = "GenericIntSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = NULL },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+     {
+        .name            = "buffer_sizes_incoming_buffer_size", //masterptr->buffer_size = LUA_GetFieldToInteger("incoming_buffer_size");
+        .config_file_key = CONF_FILE_LITERAL_BUFFER_SIZES_INCOMING_BUFFER_SIZE,
+        .value_type      = UFSRV_CONFIG_VALUE_INT,
+        .c_lang_type     = "size_t",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .stored_value = { .int_val = 2048 } } },//1kb #define _BUFFER_DEFAUL_BLOCKSZ	2048//2K
+        .lifecycle       = { .on_inflated = "GenericIntInflator", .on_value_available = "GenericIntSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = NULL },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE }, //.check = { .range = {1, 1048576} }
+    },
+     {
+        .name            = "buffer_sizes_incoming_buffer_maxsize", //masterptr->buffer_maxsize = LUA_GetFieldToInteger("incoming_buffer_maxsize");
+        .config_file_key = CONF_FILE_LITERAL_BUFFER_SIZES_INCOMING_BUFFER_MAXSIZE,
+        .value_type      = UFSRV_CONFIG_VALUE_INT,
+        .c_lang_type     = "size_t",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .stored_value = { .int_val = 1024000 } } },//1mb #define _BUFFER_MAX_BLOCKSZ 1024000 //1MB
+        .lifecycle       = { .on_inflated = "GenericIntInflator", .on_value_available = "GenericIntSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = NULL },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE }, //.check = { .range = {1, 104857600} }
+    },
+     {
+        .name            = "buffer_sizes_outgoing_buffer_size", //not in active use yet
+        .config_file_key = CONF_FILE_LITERAL_BUFFER_SIZES_OUTGOING_BUFFER_SIZE,
+        .value_type      = UFSRV_CONFIG_VALUE_INT,
+        .c_lang_type     = "size_t",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .stored_value = { .int_val = 1024 } } },//1kb
+        .lifecycle       = { .on_inflated = "GenericIntInflator", .on_value_available = "GenericIntSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = NULL },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+     {
+        .name            = "buffer_sizes_holding_buffer_size",//not in active use yet
+        .config_file_key = CONF_FILE_LITERAL_BUFFER_SIZES_HOLDING_BUFFER_SIZE,
+        .value_type      = UFSRV_CONFIG_VALUE_INT,
+        .c_lang_type     = "size_t",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .stored_value = { .int_val = 1024 } } },//1kb
+        .lifecycle       = { .on_inflated = "GenericIntInflator", .on_value_available = "GenericIntSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = NULL },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = "sys_runtime_run_as_user",
+        .config_file_key = CONF_FILE_LITERAL_SYS_RUNTIME_RUN_AS_USER,
+        .value_type      = UFSRV_CONFIG_VALUE_STR,
+        .c_lang_type     = "char *",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .stored_value = { .str_val = "ufsrv" }, .type_allocation_sz = 65 } }, //MINBUF + nil
+        .lifecycle = { .on_inflated = "GenericStrInflator", .on_value_available = "GenericStrSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = "GenericStrTeardown" },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+        // NOTE: struct { run_as_user[MINIBUF], chroot_pathname[256] }
+    },
+    {
+        .name            = "sys_runtime_chroot",
+        .config_file_key = CONF_FILE_LITERAL_SYS_RUNTIME_CHROOT,
+        .value_type      = UFSRV_CONFIG_VALUE_STR,
+        .c_lang_type     = "char *",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .stored_value = { .str_val = "/" }, .type_allocation_sz = 257 } }, //_POSIX_PATH_MAX + + nil
+        .lifecycle = { .on_inflated = "GenericStrInflator", .on_value_available = "GenericStrSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = "GenericStrTeardown" },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+
+    {
+        .name            = "logger_driver",
+        .config_file_key = CONF_FILE_LITERAL_LOGGER_DRIVER,
+        .value_type      = UFSRV_CONFIG_VALUE_STR,
+        .c_lang_type     = "char *",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .stored_value = { .str_val = "file" }, .type_allocation_sz = 16 } },
+        .lifecycle = { .on_inflated = "GenericStrInflator", .on_value_available = "GenericStrSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = "GenericStrTeardown" },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NOT_EMPTY },
+    },
+    {
+        .name            = "logger_format",
+        .config_file_key = CONF_FILE_LITERAL_LOGGER_FORMAT,
+        .value_type      = UFSRV_CONFIG_VALUE_STR,
+        .c_lang_type     = "char *",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .stored_value = { .str_val = "%d(%F %T) %-8V [%c] %f:%L %m%n" }, .type_allocation_sz = 4096 } },
+        .lifecycle = { .on_inflated = "GenericStrInflator", .on_value_available = "GenericStrSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = "GenericStrTeardown" },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NOT_EMPTY },
+    },
+    {
+        .name            = "logger_prefix",
+        .config_file_key = CONF_FILE_LITERAL_LOGGER_PREFIX,
+        .value_type      = UFSRV_CONFIG_VALUE_STR,
+        .c_lang_type     = "char *",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .stored_value = { .str_val = "ufsrv" }, .type_allocation_sz = 128 } },
+        .lifecycle = { .on_inflated = "GenericStrInflator", .on_value_available = "GenericStrSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = "GenericStrTeardown" },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+
+    {
+        .name            = "ratelimit_is_enabled",
+        .config_file_key = CONF_FILE_LITERAL_RATELIMIT_IS_ENABLED,
+        .value_type      = UFSRV_CONFIG_VALUE_BOOL,
+        .c_lang_type     = "bool",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .stored_value = { .int_val = false } } },
+        .lifecycle = { .on_inflated = "GenericBoolInflator", .on_value_available = "GenericBoolSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = NULL },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = "ratelimit_is_bypass_private_ip",
+        .config_file_key = CONF_FILE_LITERAL_RATELIMIT_IS_BYPASS_PRIVATE_IP,
+        .value_type      = UFSRV_CONFIG_VALUE_BOOL,
+        .c_lang_type     = "bool",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .stored_value = { .int_val = false } } },
+        .lifecycle = { .on_inflated = "GenericBoolInflator", .on_value_available = "GenericBoolSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = NULL },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+
+    {
+        .name            = "oauth_access_token_format",
+        .config_file_key = CONF_FILE_LITERAL_OAUTH_ACCESS_TOKEN_FORMAT,
+        .value_type      = UFSRV_CONFIG_VALUE_STR,
+        .c_lang_type     = "char *",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .stored_value = { .str_val = "jwt" }, .type_allocation_sz = 16 } },
+        .lifecycle       = { .on_inflated = "GenericStrInflator", .on_value_available = "GenericStrSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = "GenericStrTeardown" },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = "oauth_jwt_issuer",
+        .config_file_key = CONF_FILE_LITERAL_OAUTH_JWT_ISSUER,
+        .value_type      = UFSRV_CONFIG_VALUE_STR,
+        .c_lang_type     = "char *",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .stored_value = { .str_val = "" }, .type_allocation_sz = 256 } }, //MINIBUF
+        .lifecycle       = { .on_inflated = "GenericStrInflator", .on_value_available = "GenericStrSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = "GenericStrTeardown" },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = "oauth_jwt_signing_key",
+        .config_file_key = CONF_FILE_LITERAL_OAUTH_JWT_SIGNING_KEY,
+        .value_type      = UFSRV_CONFIG_VALUE_STR,
+        .c_lang_type     = "char *",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .stored_value = { .str_val = "" }, .type_allocation_sz = 1024 } }, //path-sized
+        .lifecycle       = { .on_inflated = "GenericStrInflator", .on_value_available = "GenericStrSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = "GenericStrTeardown" },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = "oauth_jwt_active_kid",
+        .config_file_key = CONF_FILE_LITERAL_OAUTH_JWT_ACTIVE_KID,
+        .value_type      = UFSRV_CONFIG_VALUE_STR,
+        .c_lang_type     = "char *",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .stored_value = { .str_val = "" }, .type_allocation_sz = 128 } },
+        .lifecycle       = { .on_inflated = "GenericStrInflator", .on_value_available = "GenericStrSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = "GenericStrTeardown" },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+
+    {
+        .name            = "oauth_settings", //needs custom setter
+        .value_type      = UFSRV_CONFIG_VALUE_STRUCT,
+        .c_lang_type     = "UfsrvConfigOauth",
+        .domain          = UFSRV_CONFIG_DOMAIN_RUNTIME,
+        .config_field_default    = { .config = { .type_allocation_sz = sizeof(UfsrvConfigOauth) } },
+        .lifecycle       = { .on_inflated = "GenericStructInflator", .on_value_available = NULL, .on_value_reloaded = "GenericReloadedStub", .on_teardown = "GenericStructTeardown" },
+        .is_as_ptr_getter = true,
+        .is_keep_custom_setter = true, //where this is set, .on_value_available should be unset. The generator emits an extern UfsrvConfigSet<Name>() declaration plus a generated lifecycle bridge UfsrvConfig<Name>Setter() which it wires into the field table's .on_value_available
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    // Config: UFSRVResult (value struct)
+    {
+        .name            = "ufsrv_result",
+        .value_type      = UFSRV_CONFIG_VALUE_STRUCT,
+        .c_lang_type     = "UFSRVResult",
+        .domain          = UFSRV_CONFIG_DOMAIN_RUNTIME,
+        .config_field_default    = { .config = { .type_allocation_sz = 16 } }, //16 bytes sizeof(UFSRVResult)
+        .lifecycle = { .on_inflated = "GenericStructInflator", .on_value_available = "GenericStructSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = "GenericStructTeardown" },
+        .is_as_ptr_getter = true,
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = "threads_subsystem_ufsrv_once",
+        .value_type      = UFSRV_CONFIG_VALUE_STRUCT,
+        .c_lang_type     = "pthread_once_t",
+        .domain          = UFSRV_CONFIG_DOMAIN_RUNTIME,
+        .config_field_default    = { .config = { .type_allocation_sz = sizeof(pthread_once_t) } },
+        .lifecycle = { .on_inflated = "GenericStructInflator", .on_value_available = "GenericStructSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = "GenericStructTeardown" },
+        .is_as_ptr_getter = true,
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = "uf_logger",
+        .value_type      = UFSRV_CONFIG_VALUE_PTR,
+        .c_lang_type     = "UfLogger *",
+        .domain          = UFSRV_CONFIG_DOMAIN_RUNTIME,
+        .config_field_default    = { .config = {  } },
+        .lifecycle = { .on_inflated = NULL, .on_value_available = "GenericPtrSetter", .on_value_reloaded = NULL, .on_teardown = NULL},
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+
+    // Outbound e-mail provider (Mailgun-compatible HTTP API).  api_key holds an
+    // enc:v1 envelope, decrypted at the point of use exactly like
+    // db_backend.password — the store keeps the ciphertext.
+    {
+        .name            = "email_api_key",
+        .value_type      = UFSRV_CONFIG_VALUE_STR,
+        .config_file_key = CONF_FILE_LITERAL_EMAIL_API_KEY,
+        .c_lang_type     = "char *",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .stored_value = { .str_val = "" }, .type_allocation_sz = 256 } }, //MINIBUF
+        .lifecycle       = { .on_inflated = "GenericStrInflator", .on_value_available = "GenericStrSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = "GenericStrTeardown" },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+    {
+        .name            = "email_api_url",
+        .value_type      = UFSRV_CONFIG_VALUE_STR,
+        .config_file_key = CONF_FILE_LITERAL_EMAIL_API_URL,
+        .c_lang_type     = "char *",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default    = { .config = { .stored_value = { .str_val = "" }, .type_allocation_sz = 1024 } }, //path-sized
+        .lifecycle       = { .on_inflated = "GenericStrInflator", .on_value_available = "GenericStrSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = "GenericStrTeardown" },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+
+    // Sentinel — do not remove
+    { .name = NULL }
+};
+
+/* Number of fields (excluding sentinel). */
+static const size_t core_field_count =
+    (sizeof(core_fields) / sizeof(core_fields[0])) - 1;

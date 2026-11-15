@@ -1,0 +1,48 @@
+# Pin the mirror control files to LF regardless of core.autocrlf.
+# CRLF here silently defeats the exclusion parsing and leaks private files
+# into the public GitHub mirror (see devops/post_squash_hook.sh).
+devops/git_mirror_exclusions.txt                text eol=lf
+devops/git_last_mirror_commit_ids_registry.txt  text eol=lf
+devops/*.sh                                      text eol=lf
+
+# Auto-detect text files and normalize line endings to LF
+* text=auto
+
+# Scripts
+*.sh text eol=lf
+
+# C/C++
+*.c text eol=lf
+*.h text eol=lf
+*.cpp text eol=lf
+*.cc text eol=lf
+
+# cmake
+*.cmake text eol=lf
+CMakeLists.txt text eol=lf
+*.cmake.in text eol=lf
+
+# Python
+*.py text eol=lf
+
+# Config / templates
+*.in text eol=lf
+*.json text eol=lf
+*.txt text eol=lf
+*.cfg text eol=lf
+*.conf text eol=lf
+
+# Lua
+*.lua text eol=lf
+
+# Docs
+*.md text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+
+# IDE / tooling
+*.xml text eol=lf
+*.iml text eol=lf
+.gitattributes text eol=lf
+.gitignore text eol=lf
+*.clang text eol=lf

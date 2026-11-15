@@ -1,0 +1,54 @@
+# Truth table generated 2026-08-20T12:24:06Z
+# Source: valid_full.lua
+ABSENT ufnet.cache_backend_fence.address
+ABSENT ufnet.cache_backend_fence.port
+ABSENT ufnet.cache_backend_usrmsg.address
+ABSENT ufnet.cache_backend_usrmsg.port
+STR ufnet.db_backend.address db.ufsrv.unfacd.com
+STR ufnet.db_backend.password secret
+INT ufnet.db_backend.port 19800
+STR ufnet.db_backend.username ufsrv_user
+ABSENT ufnet.geoip_service.address
+ABSENT ufnet.geoip_service.port
+ABSENT ufnet.msgqueue.address
+ABSENT ufnet.msgqueue.is_enabled
+ABSENT ufnet.msgqueue.port
+ABSENT ufnet.persistence_backend.address
+ABSENT ufnet.persistence_backend.port
+ABSENT ufsrv.buffer_sizes.holding_buffer_size
+INT ufsrv.buffer_sizes.incoming_buffer_maxsize 1024000
+INT ufsrv.buffer_sizes.incoming_buffer_size 4096
+ABSENT ufsrv.buffer_sizes.outgoing_buffer_size
+ABSENT ufsrv.command_console_address
+ABSENT ufsrv.command_console_port
+ARRAY ufsrv.fileloader.black_listed_files 3 /etc/passwd /etc/shadow /proc/self/mem
+INT ufsrv.fileloader.enabled 1
+INT ufsrv.fileloader.registry_hot_loaded 128
+INT ufsrv.fileloader.registry_size 8192
+ABSENT ufsrv.instrumentation_backend.address
+ABSENT ufsrv.instrumentation_backend.port
+ABSENT ufsrv.intra_ufsrv_classname
+INT ufsrv.listener_workers_thread_pool 1
+ABSENT ufsrv.main_listener_address
+INT ufsrv.main_listener_port 19701
+ABSENT ufsrv.main_listener_protocol_id
+INT ufsrv.memory_specs_for_session.allocation_groups 5
+STR ufsrv.memory_specs_for_session.allocation_threshold_trigger 20%
+INT ufsrv.memory_specs_for_session.sessions_per_allocation_group 512
+ABSENT ufsrv.server_cpu_affinity
+INT ufsrv.server_id 1
+STR ufsrv.server_run_mode normal
+INT ufsrv.session_workers_thread_pool 2
+ABSENT ufsrv.ssl.certificate
+ABSENT ufsrv.ssl.key
+ABSENT ufsrv.ssl.location
+ABSENT ufsrv.stats_backend.address
+ABSENT ufsrv.stats_backend.port
+STR ufsrv.sys_runtime.chroot /
+STR ufsrv.sys_runtime.run_as_user 
+INT ufsrv.ufsrv_geogroup 3
+INT ufsrv.ufsrv_workers_thread_pool 2
+INT ufsrv.user_timeouts.connected_timeout 120
+INT ufsrv.user_timeouts.locationless_timeout 300
+INT ufsrv.user_timeouts.suspended_timeout 60
+INT ufsrv.user_timeouts.unauthenticated_timeout 60
