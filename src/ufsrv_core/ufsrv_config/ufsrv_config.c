@@ -354,6 +354,7 @@ UfsrvConfigTypeLiteral(const UfsrvConfigValueType type)
     case UFSRV_CONFIG_VALUE_CONST_PTR:        return "const_pointer";
     case UFSRV_CONFIG_VALUE_ENUM:             return "enum";
     case UFSRV_CONFIG_VALUE_ARRAY:            return "array";
+    case UFSRV_CONFIG_VALUE_COLLECTION:       return "collection";
     case UFSRV_CONFIG_VALUE_BOOL:             return "bool";
     case UFSRV_CONFIG_VALUE_DOUBLE:           return "double";
     default:                                  return "unknown";

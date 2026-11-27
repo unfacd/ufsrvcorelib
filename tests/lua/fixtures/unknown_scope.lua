@@ -2,7 +2,7 @@
 return {
     ufsrv = {
         ufsrv_geogroup     = 1,
-        main_listener_port = 19701,
+        command_console_port = 19701,
     },
     some_random_scope = {
         foo = "bar",

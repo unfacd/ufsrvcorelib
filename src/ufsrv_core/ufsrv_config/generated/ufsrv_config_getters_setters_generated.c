@@ -1,10 +1,10 @@
 /*
  * ufsrv_config_getters_setters_generated.c — GENERATED, DO NOT EDIT
  *
- * Version:    64
- * Generated:  Sat Nov 14 18:43:04 2026
- * Generator:  d3a5e2999eee548a6b4085cdfceb7e4b3147be96
- * Catalogue:  230f5576d045ec937ddf358928b972cbd2b0f89e
+ * Version:    67
+ * Generated:  Fri Nov 27 09:26:14 2026
+ * Generator:  aa42f0acec8015b8cfd0669182be202dd836212c
+ * Catalogue:  d4bb12e727d8ec36dff666a85d4d064353052fb3
  * Master include — pulls in all decomposed generated source files.
  */
 

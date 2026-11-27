@@ -119,6 +119,17 @@ add_compile_definitions(UFSRV_DEBUG_BUILD=${UFSRV_DEBUG_BUILD}
                         UFSRV_DEBUG_BUILD_L2=${UFSRV_DEBUG_L2}
                         UFSRV_DEBUG_BUILD_L3=${UFSRV_DEBUG_L3})
 
+include(CheckIncludeFile)
+find_path(VALGRIND_INCLUDE_DIR valgrind/valgrind.h
+    HINTS ${VALGRIND_ROOT}/include /opt/include)
+if(VALGRIND_INCLUDE_DIR)
+    set(CMAKE_REQUIRED_INCLUDES "${VALGRIND_INCLUDE_DIR}")
+endif()
+check_include_file(valgrind/valgrind.h HAVE_VALGRIND)
+check_include_file(valgrind/drd.h HAVE_VALGRIND_DRD)
+check_include_file(valgrind/memcheck.h HAVE_VALGRIND_MEMCHECK)
+unset(CMAKE_REQUIRED_INCLUDES)
+
 include(config_defaults_definitions)
 configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/config_ufsrvcorelib.h.in
@@ -283,9 +294,11 @@ target_include_directories(${_PROJECT_NAME}
         $<INSTALL_INTERFACE:include>
         $<INSTALL_INTERFACE:include/ufsrvcorelib>
     PRIVATE
+        ${VALGRIND_INCLUDE_DIR}
         ${CMAKE_CURRENT_SOURCE_DIR}/src
         ${CMAKE_CURRENT_SOURCE_DIR}/src/ufsrv_core/ufsrv_config
         ${CMAKE_CURRENT_SOURCE_DIR}/src/ufsrv_core/system
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/ufsrv_core/sfu_server
         ${CMAKE_CURRENT_SOURCE_DIR}/src/ufsrv_core/configfile_processor
         ${CMAKE_CURRENT_SOURCE_DIR}/src/ufsrv_core/instrumentation
         ${CMAKE_CURRENT_SOURCE_DIR}/src/ufsrv_core/cli_configurator
@@ -297,10 +310,13 @@ target_include_directories(${_PROJECT_NAME}
         ${JSONC_INCLUDE_DIRS}
         ${JEMALLOC_INCLUDE_DIRS}
         ${SYSTEMD_INCLUDE_DIRS}
+        ${CMAKE_CURRENT_SOURCE_DIR}/packages           # <hiredis/hiredis.h>
         ${CMAKE_CURRENT_SOURCE_DIR}/packages/csonpath
         # ── Generated files (key-map consumed by configfile_processor) ───
         ${CMAKE_CURRENT_SOURCE_DIR}/src/ufsrv_core/ufsrv_config/generated
 )
+
+find_package(libSRTP QUIET)
 
 # ── Link dependencies ──
 # One list per visibility class: the OBJECT target uses both, and so does the
@@ -309,6 +325,7 @@ target_include_directories(${_PROJECT_NAME}
 set(_UFSRVCORELIB_PUBLIC_LIBS
     uflib::uflib
     ${_PROJECT_NAME}_packages
+    PkgConfig::CURL
 )
 set(_UFSRVCORELIB_PRIVATE_LIBS
     ${CMAKE_THREAD_LIBS_INIT}
@@ -316,13 +333,20 @@ set(_UFSRVCORELIB_PRIVATE_LIBS
     ${JSONC_LIBRARIES}
     ${JEMALLOC_LIBRARIES}
     ${SYSTEMD_LIBRARIES}
+    OpenSSL::SSL
+    PkgConfig::MARIADB
     OpenSSL::Crypto
+    ${UFSRVCORELIB_BSD_LIBRARY}
+    m
 )
 
 target_link_libraries(${_PROJECT_NAME}
     PUBLIC ${_UFSRVCORELIB_PUBLIC_LIBS}
     PRIVATE ${_UFSRVCORELIB_PRIVATE_LIBS}
 )
+if(libSRTP_FOUND)
+    target_link_libraries(${_PROJECT_NAME} PRIVATE libSRTP::srtp3)
+endif()
 
 # ── Link closure for the shared library ─────────────────────────────────────
 # libufsrvcorelib.so is built from $<TARGET_OBJECTS:...>, which carries no usage
@@ -347,10 +371,19 @@ set_target_properties(${_PROJECT_NAME} PROPERTIES
 
 # ── Sources (explicit) ──
 target_sources(${_PROJECT_NAME} PRIVATE
+    # ── ufsrv_core (main-process helpers: config bootstrap, logger, daemon) ─
+    src/ufsrv_core/main_utils.c
+
     # ── ufsrv_core/system ────────────────────────────────────────────────
     src/ufsrv_core/system/utils_cpu.c
     src/ufsrv_core/system/utils_runtime.c
     src/ufsrv_core/system/utils_jemalloc.c
+    src/ufsrv_core/system/thread_utils.c
+    src/ufsrv_core/system/ufsrv_signals.c
+
+    # ── ufsrv_core/session ───────────────────────────────────────────────
+    src/ufsrv_core/session/sessions_utils.c
+    src/ufsrv_core/session/session_io.c
 
     # ── ufsrv_core/configfile_processor ──────────────────────────────────
     src/ufsrv_core/configfile_processor/configfile_processor.c
@@ -367,8 +400,91 @@ target_sources(${_PROJECT_NAME} PRIVATE
     # ── ufsrv_core/ufsrv_config ──────────────────────────────────────
     src/ufsrv_core/ufsrv_config/ufsrv_config_pretty_printers.c
     src/ufsrv_core/ufsrv_config/ufsrv_config_secret.c
+    src/ufsrv_core/turn/turn_ephemeral_credential.c
+    # ── ufsrv_core/turn/codec (vendored coturn RFC 5389/5769 codec) ──────
+    src/ufsrv_core/turn/codec/ns_turn_msg.c
+    src/ufsrv_core/turn/codec/ns_turn_msg_addr.c
+    src/ufsrv_core/turn/codec/ns_turn_ioaddr.c
+    src/ufsrv_core/turn/codec/stun_buffer.c
+    src/ufsrv_core/turn/codec/turn_alloc.c
     src/ufsrv_core/ufsrv_config/ufsrv_config_stubs_as_string.c
     src/ufsrv_core/ufsrv_config/ufsrv_config_stubs_accessor_defs.c
+
+    # ── ufsrv_core/delegator_sessions ────────────────────────────────────
+    src/ufsrv_core/delegator_sessions/session_io_work.c
+    src/ufsrv_core/delegator_sessions/sessions_delegator.c
+    src/ufsrv_core/delegator_sessions/delegator_session_io_worker_thread.c
+
+    # ── ufsrv_core/delegator_sessions/command ────────────────────────────
+    src/ufsrv_core/delegator_sessions/command/session_delegator_command.c
+    src/ufsrv_core/delegator_sessions/command/session_delegator_command_handler.c
+
+    # ── ufsrv_core/delegator_sessions/workers ────────────────────────────
+    src/ufsrv_core/delegator_sessions/workers/jobworkers_utils.c
+    src/ufsrv_core/delegator_sessions/workers/user_callback_job.c
+    src/ufsrv_core/delegator_sessions/workers/worker_ufsrv_thread.c
+    src/ufsrv_core/delegator_sessions/workers/worker_session_io_thread.c
+    src/ufsrv_core/delegator_sessions/workers/sessionworkers_utils.c
+    src/ufsrv_core/delegator_sessions/thread_context.c
+
+    # ── ufsrv_core/udp_server ────────────────────────────────────────────
+    src/ufsrv_core/udp_server/udp_dtls.c
+    src/ufsrv_core/udp_server/udp_dtls_bio.c
+    src/ufsrv_core/udp_server/udp_dtls_context.c
+    src/ufsrv_core/udp_server/udp_flow.c
+    src/ufsrv_core/udp_server/udp_server.c
+    src/ufsrv_core/udp_server/udp_shard.c
+    src/ufsrv_core/udp_server/udp_worker.c
+
+    # ── ufsrv_core/rest_server ───────────────────────────────────────────
+    src/ufsrv_core/rest_server/rest_server.c
+    src/ufsrv_core/rest_server/rest_worker_thread.c
+
+
+    # ── ufsrv_core/protocol ──────────────────────────────────────────────
+    src/ufsrv_core/protocol/protocol.c
+
+    # ── ufsrv_core/jwt ───────────────────────────────────────────────────
+    src/ufsrv_core/jwt/jwt.c
+
+    # ── ufsrv_core/oauth ─────────────────────────────────────────────────
+    src/ufsrv_core/oauth/utils_oauth.c
+    src/ufsrv_core/oauth/client_id_metadata.c
+
+    # ── ufsrv_core/cache_backend ─────────────────────────────────────────
+    src/ufsrv_core/cache_backend/persistence.c
+    src/ufsrv_core/cache_backend/redis.c
+
+    # ── ufsrv_core/http ──────────────────────────────────────────────────
+    src/ufsrv_core/http/http_request.c
+    src/ufsrv_core/http/h_codecs.c
+    src/ufsrv_core/http/h_request.c
+    src/ufsrv_core/http/h_request_parser.c
+    src/ufsrv_core/http/http_session.c
+    src/ufsrv_core/http/vector.c
+    src/ufsrv_core/http/dictionary.c
+    src/ufsrv_core/http/mime.c
+    src/ufsrv_core/http/h_ptr_list.c
+    src/ufsrv_core/http/h_handler.c
+    src/ufsrv_core/http/h_url.c
+    src/ufsrv_core/http/h_response.c
+    src/ufsrv_core/http/utils_ptotocol_http.c
+
+    # ── ufsrv_core/http/basic_auth ───────────────────────────────────────
+    src/ufsrv_core/http/basic_auth/basic_auth.c
+    src/ufsrv_core/http/basic_auth/basic_auth_descriptor_provider.c
+
+    # ── ufsrv_core/ratelimit_v2 ─────────────────────────────────────────
+    src/ufsrv_core/ratelimit_v2/ratelimit.c
+    src/ufsrv_core/ratelimit_v2/ratelimit_backend_memory.c
+    src/ufsrv_core/ratelimit_v2/ratelimit_backend_redis.c
+
+    # ── ufsrv_core bootstrap ────────────────────────────────────────────
+    src/ufsrv_core/ufsrv_utils.c
+    src/ufsrv_core/command_console/command_console_thread.c
+
+    # ── ufsrv_core/service/timer ────────────────────────────────────────
+    src/ufsrv_core/service/timer/delegator_timer_thread.c
 
     # ── ufsrv_console_script ───────────────────────────────────────────────
     src/ufsrv_console_script/ufsrv_console_script.c
@@ -385,6 +501,32 @@ add_custom_target(${_PROJECT_NAME}_version
     VERBATIM
 )
 set_source_files_properties(${CMAKE_CURRENT_BINARY_DIR}/version.c PROPERTIES GENERATED TRUE)
+if(libSRTP_FOUND)
+    target_sources(${_PROJECT_NAME} PRIVATE
+        src/ufsrv_core/sfu_server/sfu_server.c
+        src/ufsrv_core/sfu_server/events/sfu_event_egress.c
+        src/ufsrv_core/sfu_server/events/sfu_shard_events.c
+        src/ufsrv_core/sfu_server/signalling/sfu_signaling_grant.c
+        src/ufsrv_core/sfu_server/signalling/sfu_signaling_sessions.c
+        src/ufsrv_core/sfu_server/sdp/sfu_sdp.c
+        src/ufsrv_core/sfu_server/sfu_shard_onboarding.c
+        src/ufsrv_core/sfu_server/sfu_shard_thread.c
+        src/ufsrv_core/sfu_server/sfu_shard_describe.c
+        src/ufsrv_core/sfu_server/sfu_shard_flow.c
+        src/ufsrv_core/sfu_server/sfu_shard_ice.c
+        src/ufsrv_core/sfu_server/sfu_shard_nack.c
+        src/ufsrv_core/sfu_server/sfu_shard_room.c
+        src/ufsrv_core/sfu_server/sfu_shard_subscription.c
+        src/ufsrv_core/sfu_server/sfu_shard_track.c
+        src/ufsrv_core/sfu_server/rtcp/sfu_rtcp_parse.c
+        src/ufsrv_core/sfu_server/rtcp/sfu_shard_rtcp.c
+        src/ufsrv_core/sfu_server/dtls/sfu_dtls_context.c
+        src/ufsrv_core/sfu_server/dtls/sfu_shard_dtls.c
+        src/ufsrv_core/sfu_server/srtp/sfu_shard_srtp.c
+        src/ufsrv_core/sfu_server/command/sfu_console_router.c
+    )
+endif()
+
 target_sources(${_PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/version.c)
 add_dependencies(${_PROJECT_NAME} ${_PROJECT_NAME}_version)
 
@@ -513,7 +655,14 @@ endif()
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(LUA REQUIRED IMPORTED_TARGET lua)
 pkg_check_modules(JSONC REQUIRED IMPORTED_TARGET json-c)
+# libcurl: BaseThreadContext embeds HttpRequestContext, so curl/types appear in a public header.
+pkg_check_modules(CURL REQUIRED IMPORTED_TARGET libcurl)
+pkg_check_modules(MARIADB REQUIRED IMPORTED_TARGET libmariadb)
 pkg_check_modules(JEMALLOC REQUIRED IMPORTED_TARGET jemalloc)
+
+# libbsd supplies pidfile_open()/pidfile_write(): the shared library must carry
+# the dependency itself, not leave every consumer to add -lbsd.
+find_library(UFSRVCORELIB_BSD_LIBRARY NAMES bsd REQUIRED)
 
 if(_PACKAGE_INSTALL)
     include(GNUInstallDirs)
@@ -523,10 +672,18 @@ if(_PACKAGE_INSTALL)
         uflib::uflib
         ${CMAKE_THREAD_LIBS_INIT}
         PkgConfig::LUA
+        PkgConfig::CURL
         PkgConfig::JSONC
         PkgConfig::JEMALLOC
         ${SYSTEMD_LIBRARIES}
-        OpenSSL::Crypto)
+        OpenSSL::SSL
+        PkgConfig::MARIADB
+        OpenSSL::Crypto
+        bsd
+        m)
+    if(libSRTP_FOUND)
+        list(APPEND _UFSRVCORELIB_EXPORT_LIBS libSRTP::srtp3)
+    endif()
     target_link_libraries(${_PROJECT_NAME}_static INTERFACE ${_UFSRVCORELIB_EXPORT_LIBS})
     if(BUILD_SHARED_LIBS)
         target_link_libraries(${_PROJECT_NAME}_shared INTERFACE ${_UFSRVCORELIB_EXPORT_LIBS})
@@ -588,6 +745,7 @@ if(_PACKAGE_INSTALL)
         DESTINATION ${INSTALL_CONFIGDIR}
     )
 
+    set(UFSRVCORELIB_HAVE_SRTP ${libSRTP_FOUND})
     configure_package_config_file(
         ${CMAKE_CURRENT_SOURCE_DIR}/cmake/${_PROJECT_NAME}Config.cmake.in
         ${CMAKE_CURRENT_BINARY_DIR}/${_PROJECT_NAME}Config.cmake

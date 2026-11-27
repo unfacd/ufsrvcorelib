@@ -24,6 +24,8 @@
 -- in a table constructor.  When followed by another value, only the first
 -- return is captured.  We build the path explicitly to avoid this.
 
+-- IMPORTANT EVERYTIME A CHANGE IS made roles/ufsrv_src/files/opt/ufsrv/etc/lua/ and roles/ufsrvstun_src/files/opt/ufsrv/etc/lua/ and roles/ufsrvsfu_src/files/opt/ufsrv/etc/lua/
+-- MUST BE UPDATED
 local function sPathAppend(path, key)
     local newpath = {}
     for _, v in ipairs(path) do
@@ -69,6 +71,8 @@ end
 
 -- ── Leaf value validation ────────────────────────────────────────────────
 
+local validate_table
+
 local function validate_value(value, def, path)
     -- Nil value: required fields error; optional fields use default
     if value == nil then
@@ -108,6 +112,54 @@ local function validate_value(value, def, path)
             error(string.format("Field %s must be boolean, got %s",
                 path_str(path), vtype))
         end
+
+    -- Collection (1-indexed sequence of named scalar rows)
+    elseif def.type == "collection" then
+        local field_path = path_str(path)
+        if type(def.items) ~= "table" then
+            error(string.format("Collection %s requires an item schema", field_path))
+        end
+        for key, field in pairs(def.items) do
+            local scalar = type(field) == "table" and
+                (field.type == "string" or field.type == "boolean" or
+                 field.type == "integer" or field.type == "number")
+            if type(key) ~= "string" or not scalar then
+                error(string.format("Collection %s requires named scalar field schemas", field_path))
+            end
+        end
+        if vtype ~= "table" or getmetatable(value) ~= nil then
+            error(string.format("Collection %s must be a plain table", field_path))
+        end
+        local length = rawlen(value)
+        local count = 0
+        for index in next, value do
+            if math.type(index) ~= "integer" or index < 1 or index > length then
+                error(string.format("Collection %s must be a dense sequence", field_path))
+            end
+            count = count + 1
+        end
+        if count ~= length then
+            error(string.format("Collection %s must be a dense sequence", field_path))
+        end
+        if def.min_items and count < def.min_items then
+            error(string.format("Collection %s requires at least %d rows", field_path, def.min_items))
+        end
+
+        local result = {}
+        for index = 1, length do
+            local row = rawget(value, index)
+            local row_path = sPathAppend(path, index)
+            if type(row) ~= "table" or getmetatable(row) ~= nil then
+                error(string.format("Collection row %s must be a plain table", path_str(row_path)))
+            end
+            for key in next, row do
+                if type(key) ~= "string" then
+                    error(string.format("Collection row %s requires named fields", path_str(row_path)))
+                end
+            end
+            result[index] = validate_table(row, def.items, row_path, true)
+        end
+        return result
 
     -- Array (1-indexed Lua sequence)
     elseif def.type == "array" then
@@ -161,7 +213,7 @@ end
 
 -- ── Table validation (recursive) ─────────────────────────────────────────
 
-local function validate_table(tbl, schema_tbl, path, strict)
+validate_table = function(tbl, schema_tbl, path, strict)
     path = path or {}
     local result = {}
 
@@ -203,6 +255,10 @@ local function validate_table(tbl, schema_tbl, path, strict)
                     path_str(child_path), type(child)))
             else
                 result[key] = validate_table(child, children, child_path, strict)
+                -- Explicit table schemas may check relationships between normalized fields.
+                if def.type == "table" and def.validate then
+                    def.validate(result[key], path_str(child_path))
+                end
             end
         else
             -- Leaf field (has a .type other than nested schema handling)

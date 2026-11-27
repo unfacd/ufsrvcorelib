@@ -17,11 +17,14 @@
 #include <ufsrvcorelib/ufsrv_core/ufsrv_config/generated/ufsrv_config_accessor_decls_generated.h>
 
 #include <ufsrvcorelib/ufsrv_core/ufsrv_config/ufsrv_config.h>
+#include <ufsrvcorelib/ufsrv_core/configfile_processor/configfile_processor_symbol_table_type.h>
+#include <ufsrvcorelib/ufsrv_core/delegator_sessions/ufsrv_listener_descriptor_type.h>
 
 #include <uflib/adt/adt_distinct_array.h>
 #include <uflib/collection_descriptor_type.h>
 
 #include <limits.h>
+#include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
 
@@ -147,6 +150,104 @@ UfsrvConfigSetFileloaderFilesRegistry(UfsrvConfigItem *item, UfsrvConfigSource c
     slot->stored_value.blob_val = calloc(1, sizeof(CollectionDescriptor));
   }
   slot->source = config_source;
+}
+
+static const char *
+sListenerString(const ConfFileSymbolTableEntry *entry, char **text)
+{
+  if (entry->type != UFSRV_CONFIG_VALUE_STR) return NULL;
+  size_t size = entry->value.type_allocation_sz;
+  const char *value = entry->value.stored_value.str_val;
+  if (size < 2 || !value ||
+      value[size - 1] != '\0' || memchr(value, '\0', size - 1)) return NULL;
+  char *copy = *text;
+  memcpy(copy, value, size);
+  *text += size;
+  return copy;
+}
+
+static bool
+sListenerFromRow(const ConfFileCollectionRow *row, UfsrvListenerDescriptor *listener, char **text)
+{
+  for (size_t i = 0; i < row->field_count; ++i) {
+    const ConfFileSymbolTableEntry *entry = &row->fields[i];
+    if (strcmp(entry->key, "name") == 0) {
+      listener->name = sListenerString(entry, text);
+    } else if (strcmp(entry->key, "address") == 0) {
+      listener->bind_address = sListenerString(entry, text);
+    } else if (strcmp(entry->key, "protocol") == 0) {
+      listener->protocol_key = sListenerString(entry, text);
+    } else if (strcmp(entry->key, "port") == 0) {
+      if (entry->type == UFSRV_CONFIG_VALUE_INT) {
+        int64_t port = entry->value.stored_value.int_val;
+        if (port > 0 && port <= UINT16_MAX) listener->port = (uint16_t)port;
+      } else if (entry->type == UFSRV_CONFIG_VALUE_DOUBLE) {
+        double port = entry->value.stored_value.double_value;
+        if (port >= 1 && port <= UINT16_MAX && port == (uint16_t)port) listener->port = (uint16_t)port;
+      }
+    }
+  }
+  return listener->name && listener->bind_address && listener->port && listener->protocol_key;
+}
+
+void
+UfsrvConfigSetListeners(UfsrvConfigItem *item, UfsrvConfigSource config_source)
+{
+  const ConfFileCollection *input = item && config_source != UFSRV_CONFIG_SOURCE_DEFAULTS
+      ? item->value.stored_value.blob_val : NULL;
+  size_t count = input ? input->row_count : 0;
+  if (count == 0 && config_source != UFSRV_CONFIG_SOURCE_DEFAULTS) {
+    syslog(LOG_ERR, "ufsrv.listeners requires a nonempty collection");
+    exit(EXIT_FAILURE);
+  }
+
+  size_t text_size = 0;
+  for (size_t i = 0; i < count; ++i) {
+    const ConfFileCollectionRow *row = &input->rows[i];
+    for (size_t j = 0; j < row->field_count; ++j) {
+      const ConfFileSymbolTableEntry *entry = &row->fields[j];
+      if (entry->type == UFSRV_CONFIG_VALUE_STR) {
+        if (entry->value.type_allocation_sz > SIZE_MAX - text_size) goto allocation_error;
+        text_size += entry->value.type_allocation_sz;
+      }
+    }
+  }
+
+  const size_t alignment = _Alignof(UfsrvListenerDescriptor);
+  if (count > (SIZE_MAX - sizeof(CollectionDescriptor) - (alignment - 1)) / sizeof(collection_t *)) goto allocation_error;
+  size_t offset = sizeof(CollectionDescriptor) + count * sizeof(collection_t *);
+  offset += (alignment - offset % alignment) % alignment;
+  if (text_size > SIZE_MAX - offset || count > (SIZE_MAX - offset - text_size) / sizeof(UfsrvListenerDescriptor)) goto allocation_error;
+  size_t size = offset + count * sizeof(UfsrvListenerDescriptor) + text_size;
+
+  CollectionDescriptor *collection = calloc(1, size);
+  if (!collection) goto allocation_error;
+  collection->collection_sz = count;
+  collection->collection = count ? (void *)(collection + 1) : NULL;
+  UfsrvListenerDescriptor *listeners = (void *)((char *)collection + offset);
+  char *text = (char *)(listeners + count);
+  for (size_t i = 0; i < count; ++i) {
+    if (!sListenerFromRow(&input->rows[i], &listeners[i], &text)) {
+      syslog(LOG_ERR, "ufsrv.listeners[%zu]: invalid listener descriptor", i + 1);
+      free(collection);
+      exit(EXIT_FAILURE);
+    }
+    collection->collection[i] = &listeners[i];
+  }
+
+  UfsrvConfigValue *slot = UfsrvConfigConfFileValuesInstance(UFSRV_CONFIG_FIELD_LISTENERS);
+  free(slot->stored_value.blob_val);
+  *slot = (UfsrvConfigValue){
+    .stored_value.blob_val = collection,
+    .type_allocation_sz = size,
+    .collection_sz = count,
+    .source = config_source,
+  };
+  return;
+
+allocation_error:
+  syslog(LOG_ERR, "ufsrv.listeners: could not allocate listener descriptors");
+  exit(EXIT_FAILURE);
 }
 
 void

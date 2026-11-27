@@ -1,0 +1,340 @@
+/*
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
+ * https://opensource.org/license/bsd-3-clause
+ *
+ * Copyright (C) 2011, 2012, 2013 Citrix Systems
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the project nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
+#ifndef __LIB_TURN_MSG__
+#define __LIB_TURN_MSG__
+
+#include <ufsrvcorelib/ufsrv_core/turn/codec/ns_turn_defs.h> // for turn_time_t
+#include <ufsrvcorelib/ufsrv_core/turn/codec/ns_turn_ioaddr.h>
+#include <ufsrvcorelib/ufsrv_core/turn/codec/ns_turn_msg_defs.h>
+
+#include <stdbool.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+///////////////////////////////////
+
+/**
+ * Structure holding the STUN message Transaction ID
+ */
+#define STUN_TID_SIZE (12)
+
+typedef struct
+{
+  /**
+   * Binary array
+   */
+  uint8_t tsx_id[STUN_TID_SIZE];
+} stun_tid;
+
+typedef enum
+{
+  TURN_CREDENTIALS_NONE = 0,
+  TURN_CREDENTIALS_LONG_TERM,
+  TURN_CREDENTIALS_SHORT_TERM,
+  TURN_CREDENTIALS_UNDEFINED
+} turn_credential_type;
+
+/**
+ * HMAC key
+ */
+typedef uint8_t hmackey_t[64];
+
+typedef uint8_t       password_t[STUN_MAX_PWD_SIZE + 1];
+typedef unsigned long band_limit_t;
+
+///////////////////////////////////
+
+typedef const void *stun_attr_ref;
+
+//////////////////////////////////////////////////////////////
+
+bool stun_tid_equals(const stun_tid *id1, const stun_tid *id2);
+void stun_tid_cpy(stun_tid *id_dst, const stun_tid *id_src);
+void stun_tid_generate(stun_tid *id);
+
+///////////////////////////////////////////////////////////////
+
+uint16_t stun_make_type(uint16_t method);
+uint16_t stun_make_request(uint16_t method);
+uint16_t stun_make_indication(uint16_t method);
+uint16_t stun_make_success_response(uint16_t method);
+uint16_t stun_make_error_response(uint16_t method);
+
+///////////////////////////////////////////////////////////////
+
+turn_time_t stun_adjust_allocate_lifetime(turn_time_t lifetime, turn_time_t max_allowed_lifetime,
+                                          turn_time_t max_lifetime);
+
+///////////// STR ////////////////////////////////////////////////
+
+int stun_method_str(uint16_t method, char *smethod);
+
+/* >0 complete frame length; -1 need more bytes; 0 declared size can never fit. */
+int stun_get_message_len_str(uint8_t *buf, size_t len, int padding, size_t *app_len);
+
+void stun_init_buffer_str(uint8_t * buf, size_t * len);
+void stun_init_command_str(uint16_t message_type, uint8_t *buf, size_t *len);
+void old_stun_init_command_str(uint16_t message_type, uint8_t *buf, size_t *len, uint32_t cookie);
+void stun_init_request_str(uint16_t method, uint8_t *buf, size_t *len);
+void stun_init_indication_str(uint16_t method, uint8_t *buf, size_t *len);
+void stun_init_success_response_str(uint16_t method, uint8_t *buf, size_t *len, stun_tid *id);
+void old_stun_init_success_response_str(uint16_t method, uint8_t *buf, size_t *len, stun_tid *id, uint32_t cookie);
+void stun_init_error_response_str(uint16_t method, uint8_t *buf, size_t *len, uint16_t error_code,
+                                  const uint8_t *reason, stun_tid *id, bool include_reason_string);
+void old_stun_init_error_response_str(uint16_t       method, uint8_t * buf, size_t *len, uint16_t error_code,
+                                      const uint8_t *reason, stun_tid *id, uint32_t cookie, bool include_reason_string);
+bool stun_init_channel_message_str(uint16_t chnumber, uint8_t *buf, size_t *len, int length, bool do_padding);
+
+bool stun_is_command_message_str(const uint8_t *buf, size_t blen);
+bool old_stun_is_command_message_str(const uint8_t *buf, size_t blen, uint32_t *cookie);
+bool stun_is_command_message_full_check_str(const uint8_t *buf, size_t blen, bool must_check_fingerprint,
+                                            bool *fingerprint_present);
+bool stun_is_request_str(const uint8_t *buf, size_t len);
+bool stun_is_success_response_str(const uint8_t *buf, size_t len);
+bool stun_is_error_response_str(const uint8_t *buf, size_t len, int *err_code, uint8_t *err_msg, size_t err_msg_size);
+bool stun_is_challenge_response_str(const uint8_t *buf, size_t            len, int *      err_code, uint8_t *err_msg,
+                                    size_t         err_msg_size, uint8_t *realm, uint8_t *nonce, uint8_t *server_name,
+                                    bool *         oauth);
+bool     stun_is_response_str(const uint8_t *buf, size_t len);
+bool     stun_is_indication_str(const uint8_t *buf, size_t len);
+uint16_t stun_get_method_str(const uint8_t *buf, size_t len);
+uint16_t stun_get_msg_type_str(const uint8_t *buf, size_t len);
+bool     stun_is_channel_message_str(const uint8_t *buf, size_t *blen, uint16_t *chnumber, bool mandatory_padding);
+bool     is_channel_msg_str(const uint8_t *buf, size_t blen);
+
+void stun_set_binding_request_str(uint8_t * buf, size_t * len);
+bool stun_set_binding_response_str(uint8_t *buf, size_t *len, stun_tid *tid, const ioa_addr *reflexive_addr,
+                                   int      error_code, const uint8_t *reason, uint32_t cookie, bool old_stun,
+                                   bool     stun_backward_compatibility, bool include_reason_string);
+bool stun_is_binding_request_str(const uint8_t *buf, size_t len, size_t offset);
+bool stun_is_binding_response_str(const uint8_t *buf, size_t len);
+
+void stun_tid_from_message_str(const uint8_t *buf, size_t len, stun_tid *id);
+void stun_tid_message_cpy(uint8_t *buf, const stun_tid *id);
+void stun_tid_generate_in_message_str(uint8_t * buf, stun_tid * id);
+
+int stun_get_command_message_len_str(const uint8_t *buf, size_t len);
+
+const uint8_t *get_default_reason(int error_code);
+
+bool           stun_attr_is_addr(stun_attr_ref attr);
+int            stun_attr_get_type(stun_attr_ref attr);
+int            stun_attr_get_len(stun_attr_ref attr);
+const uint8_t *stun_attr_get_value(stun_attr_ref attr);
+uint16_t       stun_attr_get_channel_number(stun_attr_ref attr);
+band_limit_t   stun_attr_get_bandwidth(stun_attr_ref attr);
+uint8_t        stun_attr_get_even_port(stun_attr_ref attr);
+uint64_t       stun_attr_get_reservation_token_value(stun_attr_ref attr);
+stun_attr_ref  stun_attr_get_first_by_type_str(const uint8_t *buf, size_t len, uint16_t attr_type);
+stun_attr_ref  stun_attr_get_first_str(const uint8_t *buf, size_t len);
+stun_attr_ref  stun_attr_get_next_str(const uint8_t *buf, size_t len, stun_attr_ref prev);
+/**
+ * Like stun_attr_get_next_str(), but stops once MESSAGE-INTEGRITY has been
+ * yielded. Use this to walk the attributes a message is allowed to act on.
+ *
+ * RFC 8489 Section 9: "agents MUST ignore all attributes that follow
+ * MESSAGE-INTEGRITY, with the exception of the MESSAGE-INTEGRITY-SHA256 and
+ * FINGERPRINT attributes." The HMAC only covers the bytes up to the end of
+ * MESSAGE-INTEGRITY, so trailing attributes are attacker-mutable even on a
+ * message whose integrity validates.
+ *
+ * A message carrying no MESSAGE-INTEGRITY is walked in full: nothing about it
+ * is protected, so there is no boundary to honour.
+ *
+ * FINGERPRINT is exempt in the RFC but needs no special case here: it is an
+ * unkeyed checksum validated separately over the whole message, and carries no
+ * semantics a caller would act on. MESSAGE-INTEGRITY-SHA256 is not implemented
+ * yet; when it is, this boundary moves to the end of that attribute.
+ */
+stun_attr_ref  stun_attr_get_next_covered_str(const uint8_t *buf, size_t len, stun_attr_ref prev);
+/**
+ * Like stun_attr_get_first_by_type_str(), but honours the same MESSAGE-INTEGRITY
+ * boundary as stun_attr_get_next_covered_str(): an attribute that appears only
+ * after MESSAGE-INTEGRITY is not found. Use this for any attribute the server
+ * acts on, so an unprotected copy appended past the HMAC cannot supply it.
+ */
+stun_attr_ref  stun_attr_get_first_covered_by_type_str(const uint8_t *buf, size_t len, uint16_t attr_type);
+bool           stun_attr_add_str(uint8_t *buf, size_t *len, uint16_t attr, const uint8_t *avalue, int alen);
+bool           stun_attr_add_addr_str(uint8_t *buf, size_t *len, uint16_t attr_type, const ioa_addr *ca);
+bool           stun_attr_get_addr_str(const uint8_t * buf, size_t len, stun_attr_ref attr, ioa_addr *ca,
+                                      const ioa_addr *default_addr);
+bool stun_attr_get_first_addr_str(const uint8_t * buf, size_t len, uint16_t attr_type, ioa_addr *ca,
+                                  const ioa_addr *default_addr);
+bool     stun_attr_add_channel_number_str(uint8_t *buf, size_t *len, uint16_t chnumber);
+bool     stun_attr_add_bandwidth_str(uint8_t *buf, size_t *len, band_limit_t bps);
+bool     stun_attr_add_address_error_code(uint8_t *buf, size_t *len, int requested_address_family, int error_code);
+uint16_t stun_attr_get_first_channel_number_str(const uint8_t *buf, size_t len);
+
+bool stun_set_allocate_request_str(uint8_t *buf, size_t *len, uint32_t lifetime, bool af4, bool af6, uint8_t transport,
+                                   bool mobile, const char *rt, int ep);
+bool stun_set_allocate_response_str(uint8_t *       buf, size_t *len, stun_tid *tid, const ioa_addr *relayed_addr1,
+                                    const ioa_addr *relayed_addr2, const ioa_addr *reflexive_addr, uint32_t lifetime,
+                                    uint32_t        max_lifetime, int error_code, const uint8_t *reason,
+                                    uint64_t        reservation_token, char *mobile_id, bool include_reason_string);
+
+uint16_t stun_set_channel_bind_request_str(uint8_t *buf, size_t *len, const ioa_addr *peer_addr,
+                                           uint16_t channel_number);
+void stun_set_channel_bind_response_str(uint8_t *buf, size_t *len, stun_tid *tid, int error_code, const uint8_t *reason,
+                                        bool     include_reason_string);
+
+int stun_get_requested_address_family(stun_attr_ref attr);
+
+bool stun_attr_add_fingerprint_str(uint8_t * buf, size_t * len);
+
+bool SASLprep(uint8_t * s);
+
+#define print_bin(str, len, field) print_bin_func(str, len, field, __FUNCTION__)
+void print_bin_func(const char *name, size_t len, const void *s, const char *func);
+
+/*
+ * Return -1 if failure, 0 if the integrity is not correct, 1 if OK
+ */
+int stun_check_message_integrity_by_key_str(turn_credential_type ct, uint8_t *buf, size_t len, hmackey_t key,
+                                            password_t pwd, SHATYPE shatype);
+int stun_check_message_integrity_str(turn_credential_type ct, uint8_t *buf, size_t len, const uint8_t *uname,
+                                     const uint8_t *realm, const uint8_t *upwd, SHATYPE shatype);
+bool stun_attr_add_integrity_str(turn_credential_type ct, uint8_t *buf, size_t *len, hmackey_t key, password_t pwd,
+                                 SHATYPE shatype);
+bool stun_attr_add_integrity_by_key_str(uint8_t *buf, size_t *len, const uint8_t *uname, const uint8_t *realm,
+                                        hmackey_t key, const uint8_t *nonce, SHATYPE shatype);
+bool stun_attr_add_integrity_by_user_str(uint8_t *      buf, size_t *len, const uint8_t *uname, const uint8_t *realm,
+                                         const uint8_t *upwd, const uint8_t *nonce, SHATYPE shatype);
+bool stun_attr_add_integrity_by_user_short_term_str(uint8_t *buf, size_t *len, const uint8_t *uname, password_t pwd,
+                                                    SHATYPE  shatype);
+size_t get_hmackey_size(SHATYPE shatype);
+
+/* Variants of the above keyed by an explicit HMAC key length (1..sizeof(hmackey_t)) instead of
+   get_hmackey_size(shatype); the key length is ignored for short-term credentials. */
+int turn_check_message_integrity_by_key_len_str(turn_credential_type ct, uint8_t *buf, size_t len, const uint8_t *key,
+                                                size_t key_len, password_t pwd, SHATYPE shatype);
+bool turn_attr_add_integrity_key_len_str(turn_credential_type ct, uint8_t *buf, size_t *len, const uint8_t *key,
+                                         size_t key_len, password_t pwd, SHATYPE shatype);
+bool turn_attr_add_integrity_by_key_len_str(uint8_t *      buf, size_t *len, const uint8_t *uname, const uint8_t *realm,
+                                            const uint8_t *key, size_t  key_len, const uint8_t *nonce, SHATYPE shatype);
+
+/* RFC 7635 Section 6.2: OAuth MESSAGE-INTEGRITY is keyed by the whole mac_key. legacy selects the
+   non-compliant behavior that truncates it to get_hmackey_size(shatype) (16 bytes for SHA-1). */
+size_t turn_oauth_hmackey_size(size_t mac_key_len, SHATYPE shatype, bool legacy);
+
+/*
+ * To be implemented with openssl
+ */
+
+#define TURN_RANDOM_SIZE (sizeof(long))
+long turn_random_number(void);
+
+bool stun_produce_integrity_key_str(const uint8_t *uname, const uint8_t *realm, const uint8_t *upwd, hmackey_t key,
+                                    SHATYPE        shatype);
+bool stun_calculate_hmac(const uint8_t *buf, size_t       len, const uint8_t *key, size_t sz, uint8_t *hmac,
+                         unsigned int * hmac_len, SHATYPE shatype);
+
+/* Stateless NONCE (see docs/stateless-nonce.md): the nonce a server hands out
+ * in a 401/438 challenge is an authenticated timestamp cookie,
+ *
+ *   nonce = <8 hex chars: 32-bit issue timestamp>
+ *        || <16 hex chars: HMAC-SHA256(key, "<client-addr>|<timestamp-hex>") truncated>
+ *
+ * so it can be validated later - parse the timestamp, recompute the MAC, check
+ * the age - instead of being stored in per-client session state. All hex is
+ * lowercase. The timestamp rides in the clear; it is covered by the MAC, and
+ * it is nothing an observer does not already know (the 401 itself travels in
+ * cleartext at issue time). */
+#define TURN_STATELESS_NONCE_KEY_SIZE (32)
+#define TURN_STATELESS_NONCE_TIMESTAMP_LENGTH (8)
+#define TURN_STATELESS_NONCE_MAC_LENGTH (16)
+#define TURN_STATELESS_NONCE_LENGTH (TURN_STATELESS_NONCE_TIMESTAMP_LENGTH + TURN_STATELESS_NONCE_MAC_LENGTH)
+#define TURN_STATELESS_NONCE_SIZE (TURN_STATELESS_NONCE_LENGTH + 1)
+/* How many seconds a nonce's timestamp may sit in the future of the
+ * validator's clock: the issuing listener stamps with turn_time() while the
+ * validating relay compares against its cached ctime, which can lag by a
+ * couple of timer ticks. */
+#define TURN_STATELESS_NONCE_MAX_CLOCK_SKEW (5)
+
+/* Derive the nonce-signing key from an operator-configured secret
+ * (--stateless-nonce-secret), so a fleet of servers sharing the secret
+ * cross-validates each other's nonces: key = SHA-256(label || secret) with a
+ * fixed domain-separation label, so the same string can never collide with
+ * another credential use. `key` must be exactly TURN_STATELESS_NONCE_KEY_SIZE
+ * bytes. Returns false on bad arguments or digest failure. */
+bool turn_derive_stateless_nonce_key(const uint8_t *secret, size_t secret_len, uint8_t *key, size_t key_size);
+
+/* Build the nonce issued to `addr` at `timestamp`. `nonce` receives a
+ * NUL-terminated TURN_STATELESS_NONCE_LENGTH-char string and must be at least
+ * TURN_STATELESS_NONCE_SIZE bytes. Returns false on bad arguments or HMAC
+ * failure. */
+bool turn_generate_stateless_nonce(const uint8_t *key, size_t   key_size, const ioa_addr *addr, uint32_t timestamp,
+                                   char *         nonce, size_t nonce_size);
+
+/* Validate a presented nonce for `addr`: strict format check, MAC
+ * recomputation (constant-time compare), and freshness - the embedded
+ * timestamp must not be older than `max_age` seconds nor more than
+ * TURN_STATELESS_NONCE_MAX_CLOCK_SKEW seconds ahead of `now`. On success
+ * optionally returns the embedded timestamp via `timestamp_out` (may be
+ * NULL). */
+bool turn_check_stateless_nonce(const uint8_t *key, size_t          key_size, const ioa_addr *addr, uint32_t now,
+                                uint32_t       max_age, const char *nonce, uint32_t *         timestamp_out);
+
+/* RFC 5780 */
+bool stun_attr_get_change_request_str(stun_attr_ref attr, bool *change_ip, bool *change_port);
+bool stun_attr_add_change_request_str(uint8_t *buf, size_t *len, bool change_ip, bool change_port);
+int  stun_attr_get_response_port_str(stun_attr_ref attr);
+bool stun_attr_add_response_port_str(uint8_t *buf, size_t *len, uint16_t port);
+int  stun_attr_get_padding_len_str(stun_attr_ref attr);
+bool stun_attr_add_padding_str(uint8_t *buf, size_t *len, uint16_t padding_len);
+
+/* HTTP */
+int is_http(const char *s, size_t blen);
+
+/* OAUTH */
+bool convert_oauth_key_data(const oauth_key_data *oakd, oauth_key *key, char *err_msg, size_t err_msg_size);
+bool stun_oauth_token_expiration(uint64_t timestamp, uint32_t lifetime, uint64_t now, uint64_t *expiration);
+bool decode_oauth_token(const uint8_t *server_name, const encoded_oauth_token *etoken, const oauth_key *key,
+                        oauth_token *  dtoken);
+bool encode_oauth_token(const uint8_t *    server_name, encoded_oauth_token *etoken, const oauth_key *key,
+                        const oauth_token *dtoken, const uint8_t *           nonce);
+
+/* Encrypted password */
+void generate_new_enc_password(const char *pwd, char *result);
+bool check_password_equal(const char *pin, const char *pwd);
+
+///////////////////////////////////////////////////////////////
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif //__LIB_TURN_MSG__

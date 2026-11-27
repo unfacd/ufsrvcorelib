@@ -19,7 +19,8 @@
 -- Copyright (C) 2015-2026 unfacd works
 -- SPDX-License-Identifier: AGPL-3.0-or-later
 
-
+-- IMPORTANT EVERYTIME A CHANGE IS made roles/ufsrv_src/files/opt/ufsrv/etc/lua/ and roles/ufsrvstun_src/files/opt/ufsrv/etc/lua/ and roles/ufsrvsfu_src/files/opt/ufsrv/etc/lua/
+-- MUST BE UPDATED
 local schema = {
 
     -- ══════════════════════════════════════════════════════════════════
@@ -38,9 +39,17 @@ local schema = {
         ufsrv_geogroup = { type = "integer", required = true, min = 0 },
 
         -- ── Network listeners ──────────────────────────────────────────
-        main_listener_port           = { type = "integer", required = true,  min = 1, max = 65535 },
-        main_listener_address        = { type = "string",  required = false, default = "127.0.0.1" },
-        main_listener_protocol_id    = { type = "integer", required = false, default = 1 },
+        listeners = {
+            type = "collection",
+            required = false,
+            min_items = 1,
+            items = {
+                name     = { type = "string",  required = true },
+                protocol = { type = "string",  required = true },
+                address  = { type = "string",  required = true },
+                port     = { type = "integer", required = true, min = 1, max = 65535 },
+            },
+        },
         command_console_port         = { type = "integer", required = false, default = 19700, min = 1, max = 65535 },
         command_console_address = { type = "string",  required = false, default = "127.0.0.1" },
 

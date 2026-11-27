@@ -1,11 +1,11 @@
 /*
  * ufsrv_config_getters_setters_generated.c — GENERATED, DO NOT EDIT
  *
- * Version:    64
- * Generated:  Sat Nov 14 18:43:04 2026
- * Generator:  d3a5e2999eee548a6b4085cdfceb7e4b3147be96
- * Catalogue:  230f5576d045ec937ddf358928b972cbd2b0f89e
- *   Config fields:   52
+ * Version:    67
+ * Generated:  Fri Nov 27 09:26:14 2026
+ * Generator:  aa42f0acec8015b8cfd0669182be202dd836212c
+ * Catalogue:  d4bb12e727d8ec36dff666a85d4d064353052fb3
+ *   Config fields:   50
  *   Runtime fields:  31
  */
 
@@ -49,36 +49,6 @@ ufsrv_config_field_table[UFSRV_CONFIG_FIELD_COUNT] = {
             .on_value_available = GenericIntSetter,
             .on_value_reloaded  = GenericReloadedStub,
             .on_as_string       = UfsrvConfigServerRunModeAsString,
-        },
-    },
-    [UFSRV_CONFIG_FIELD_MAIN_LISTENER_PORT] = {
-        .field_name = "main_listener_port",
-        .config = { 0 },
-        .lifecycle = {
-            .on_inflated        = GenericIntInflator,
-            .on_value_available = GenericIntSetter,
-            .on_value_reloaded  = GenericReloadedStub,
-            .on_as_string       = UfsrvConfigMainListenerPortAsString,
-        },
-    },
-    [UFSRV_CONFIG_FIELD_MAIN_LISTENER_ADDRESS] = {
-        .field_name = "main_listener_address",
-        .config = { 0 },
-        .lifecycle = {
-            .on_inflated        = GenericStrInflator,
-            .on_value_available = GenericStrSetter,
-            .on_value_reloaded  = GenericReloadedStub,
-            .on_as_string       = UfsrvConfigMainListenerAddressAsString,
-        },
-    },
-    [UFSRV_CONFIG_FIELD_MAIN_LISTENER_PROTOCOL_ID] = {
-        .field_name = "main_listener_protocol_id",
-        .config = { 0 },
-        .lifecycle = {
-            .on_inflated        = GenericIntInflator,
-            .on_value_available = GenericIntSetter,
-            .on_value_reloaded  = GenericReloadedStub,
-            .on_as_string       = UfsrvConfigMainListenerProtocolIdAsString,
         },
     },
     [UFSRV_CONFIG_FIELD_COMMAND_CONSOLE_PORT] = {
@@ -541,6 +511,16 @@ ufsrv_config_field_table[UFSRV_CONFIG_FIELD_COUNT] = {
             .on_as_string       = UfsrvConfigEmailApiUrlAsString,
         },
     },
+    [UFSRV_CONFIG_FIELD_LISTENERS] = {
+        .field_name = "listeners",
+        .config = { 0 },
+        .lifecycle = {
+            .on_inflated        = GenericStructInflator,
+            .on_value_available = UfsrvConfigListenersSetter,
+            .on_value_reloaded  = GenericReloadedStub,
+            .on_as_string       = UfsrvConfigListenersAsString,
+        },
+    },
 };
 
 // ── Runtime field table — indexed by enum UfsrvRuntimeField
@@ -897,18 +877,15 @@ ufsrv_config_field_defaults_table[UFSRV_CONFIG_FIELD_COUNT] = {
     [UFSRV_CONFIG_FIELD_SERVER_INSTANCE_ID] = { .stored_value = { .int_val = 1 }, .type_allocation_sz = 0 },
     [UFSRV_CONFIG_FIELD_UFSRV_GEOGROUP] = { .stored_value = { .int_val = 0 }, .type_allocation_sz = 0 },
     [UFSRV_CONFIG_FIELD_SERVER_RUN_MODE] = { .stored_value = { .int_val = 0 }, .type_allocation_sz = 0 },
-    [UFSRV_CONFIG_FIELD_MAIN_LISTENER_PORT] = { .stored_value = { .int_val = 19701 }, .type_allocation_sz = 0 },
-    [UFSRV_CONFIG_FIELD_MAIN_LISTENER_ADDRESS] = { .stored_value = { .str_val = "127.0.0.1" }, .type_allocation_sz = 257 },
-    [UFSRV_CONFIG_FIELD_MAIN_LISTENER_PROTOCOL_ID] = { .stored_value = { .int_val = 1 }, .type_allocation_sz = 0 },
     [UFSRV_CONFIG_FIELD_COMMAND_CONSOLE_PORT] = { .stored_value = { .int_val = 19700 }, .type_allocation_sz = 0 },
     [UFSRV_CONFIG_FIELD_COMMAND_CONSOLE_ADDRESS] = { .stored_value = { .str_val = "127.0.0.1" }, .type_allocation_sz = 257 },
     [UFSRV_CONFIG_FIELD_SERVER_CPU_AFFINITY] = { .stored_value = { .int_val = 0 }, .type_allocation_sz = 0 },
     [UFSRV_CONFIG_FIELD_SSL_COMMAND_CONSOLE_KEY_FILE] = { .stored_value = { .str_val = "ufsrv_console_ssl.key" }, .type_allocation_sz = 257 },
     [UFSRV_CONFIG_FIELD_SSL_COMMAND_CONSOLE_CERTIFICATE_FILE] = { .stored_value = { .str_val = "ufsrv_console_certificate.pem" }, .type_allocation_sz = 257 },
     [UFSRV_CONFIG_FIELD_SSL_COMMAND_CONSOLE_IS_ENABLED] = { .stored_value = { .int_val = 0 }, .type_allocation_sz = 0 },
-    [UFSRV_CONFIG_FIELD_SSL_COMMAND_CONSOLE_ALLOW_LIST_GOD] = { .stored_value = { .int_val = 0 }, .type_allocation_sz = 208 },
-    [UFSRV_CONFIG_FIELD_SSL_COMMAND_CONSOLE_ALLOW_LIST_BROWSER] = { .stored_value = { .int_val = 0 }, .type_allocation_sz = 208 },
-    [UFSRV_CONFIG_FIELD_SSL_COMMAND_CONSOLE_DENY_LIST] = { .stored_value = { .int_val = 0 }, .type_allocation_sz = 208 },
+    [UFSRV_CONFIG_FIELD_SSL_COMMAND_CONSOLE_ALLOW_LIST_GOD] = { .stored_value = { .int_val = 0 }, .type_allocation_sz = 216 },
+    [UFSRV_CONFIG_FIELD_SSL_COMMAND_CONSOLE_ALLOW_LIST_BROWSER] = { .stored_value = { .int_val = 0 }, .type_allocation_sz = 216 },
+    [UFSRV_CONFIG_FIELD_SSL_COMMAND_CONSOLE_DENY_LIST] = { .stored_value = { .int_val = 0 }, .type_allocation_sz = 216 },
     [UFSRV_CONFIG_FIELD_SSL_COMMAND_CONSOLE_CLIENT_KEY_FILE] = { .stored_value = { .str_val = "ufsrv_console_client_ssl.key" }, .type_allocation_sz = 257 },
     [UFSRV_CONFIG_FIELD_SSL_COMMAND_CONSOLE_CLIENT_CERTIFICATE_FILE] = { .stored_value = { .str_val = "ufsrv_console_client_certificate.pem" }, .type_allocation_sz = 257 },
     [UFSRV_CONFIG_FIELD_SSL_COMMAND_CONSOLE_CLIENT_IS_ENABLED] = { .stored_value = { .int_val = 0 }, .type_allocation_sz = 0 },
@@ -946,6 +923,7 @@ ufsrv_config_field_defaults_table[UFSRV_CONFIG_FIELD_COUNT] = {
     [UFSRV_CONFIG_FIELD_OAUTH_JWT_ACTIVE_KID] = { .stored_value = { .str_val = "" }, .type_allocation_sz = 128 },
     [UFSRV_CONFIG_FIELD_EMAIL_API_KEY] = { .stored_value = { .str_val = "" }, .type_allocation_sz = 256 },
     [UFSRV_CONFIG_FIELD_EMAIL_API_URL] = { .stored_value = { .str_val = "" }, .type_allocation_sz = 1024 },
+    [UFSRV_CONFIG_FIELD_LISTENERS] = { .stored_value = { .int_val = 0 }, .type_allocation_sz = 32 },
 };
 
 // ── Runtime field compiled defaults — indexed by enum UfsrvRuntimeField

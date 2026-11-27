@@ -21,9 +21,6 @@
 #include <stddef.h>
 #include <ufsrvcorelib/ufsrv_core/ufsrv_config/ufsrv_config_value_type.h>
 
-/* Forward declaration */
-typedef struct ConfFileSymbolTableEntry ConfFileSymbolTableEntry;
-
 /*!
  * Validation callback — inspect the extracted value before it is accepted.
  *

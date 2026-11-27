@@ -27,9 +27,10 @@
  *   - RUNTIME field with validation rule
  *   - Unknown value_type / empty field name
  */
-// @version 64
-// @sha     d3a5e2999eee548a6b4085cdfceb7e4b3147be96
+// @version 67
+// @sha     aa42f0acec8015b8cfd0669182be202dd836212c
 
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -933,21 +934,26 @@ static void sEmitValidationDef(void)
             break;
         case UFSRV_CONFIG_CHECK_RANGE:
         case UFSRV_CONFIG_CHECK_ENUM_RANGE:
-            fprintf(g_out,INDENT2 "// %s: range [%d, %d]\n", d->name,
-                   d->validation.check.range.min, d->validation.check.range.max);
+        case UFSRV_CONFIG_CHECK_UINT32_RANGE: {
+            const bool is_unsigned = d->validation.type == UFSRV_CONFIG_CHECK_UINT32_RANGE;
+            const int64_t min = is_unsigned ? (int64_t)d->validation.check.uint32_range.min : d->validation.check.range.min;
+            const int64_t max = is_unsigned ? (int64_t)d->validation.check.uint32_range.max : d->validation.check.range.max;
+            fprintf(g_out,INDENT2 "// %s: range [%" PRId64 ", %" PRId64 "]\n", d->name,
+                   min, max);
             fprintf(g_out,INDENT2 "{\n");
             fprintf(g_out,INDENT4 "int64_t _v = UfsrvConfigConfFileValuesInstance(\n"
                    INDENT4 INDENT2 "UFSRV%s_CONFIG_FIELD_%s)->stored_value.int_val;\n",
                    sPrefixUpper(), sUppercaseName(d->name));
-            fprintf(g_out,INDENT4 "if (_v < %d || _v > %d) {\n",
-                   d->validation.check.range.min, d->validation.check.range.max);
+            fprintf(g_out,INDENT4 "if (_v < %" PRId64 " || _v > %" PRId64 ") {\n",
+                   min, max);
             fprintf(g_out,INDENT4 "UfsrvConfigResult r = { UFSRV_CONFIG_ERR_RANGE,\n");
-            fprintf(g_out,INDENT4 "                        \"%s: out of range [%d, %d]\" };\n",
-                   d->name, d->validation.check.range.min, d->validation.check.range.max);
+            fprintf(g_out,INDENT4 "                        \"%s: out of range [%" PRId64 ", %" PRId64 "]\" };\n",
+                   d->name, min, max);
             fprintf(g_out,INDENT4 "return r;\n");
             fprintf(g_out,INDENT4 "}\n");
             fprintf(g_out,INDENT2 "}\n");
             break;
+        }
         case UFSRV_CONFIG_CHECK_PATH_EXISTS:
         case UFSRV_CONFIG_CHECK_IS_DIRECTORY:
         case UFSRV_CONFIG_CHECK_IS_FILE:

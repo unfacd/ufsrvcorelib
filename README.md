@@ -1,27 +1,30 @@
 # ufsrvcorelib
 
-Companion foundational C library for the **ufsrv** messaging-server platform. It has no
-`main()`: it provides the primitives and composables that ufsrv-class servers — ufsrvapi,
-ufsrvwebsock — are assembled from.
+Shared C runtime for ufsrv servers. It provides protocol registration, the base
+session and worker runtime, HTTP primitives, and OAuth and JWT modules.
+`ufsrvapi` and `ufsrvwebsock` supply their own protocol callbacks and application policy.
 
 ## Modules
 
-| Module | Purpose |
+| Location | Main responsibilities |
 |---|---|
-| `ufsrv_config` | Schema-driven configuration: a Lua catalogue drives generated field tables, accessors and lifecycle callbacks, with runtime stores, defaults and source tracking |
-| `configfile_processor` | Lua-style configuration file parsing — symbol tables, resolution and dumping |
-| `ufsrv_console_script` | Command console with dynamic registration and `EVAL` dispatch over a sandboxed Lua engine (`ufsrvscriptlib`) |
-| `cli_configurator` | Command-line configuration entry point (`--config=<op>`) |
-| `fileloader` | Descriptor-driven file loading, registry documents and alias maps |
-| `system`, `instrumentation` | CPU-affinity facets, jemalloc introspection, logger settings and `UFSRV` L2/L3 debug switches |
+| `src/ufsrv_core/protocol` | `Protocol`, lifecycle callbacks and runtime controls. Hosts install a registry with `InitProtocolsForUfsrv()`. |
+| `src/ufsrv_core/session`, `delegator_sessions` | `UfsrvSession`, session I/O, readiness dispatch, session and job worker pools, and per-thread context. `InitialiseDelegator()` accepts host-supplied pool, backend and callback specs. |
+| `src/ufsrv_core/http` | HTTP request parsing, Onion handler primitives, outbound HTTP and in-place `HttpSession` storage. |
+| `src/ufsrv_core/oauth`, `jwt` | OAuth client metadata, grants, token issuance, rotation, introspection and revocation. JWT handles keysets, signing, verification and JWKS. OAuth persists state in MariaDB and uses `accounts.ufsrvuid` for user JWT subjects. |
+| `src/ufsrv_core/ufsrv_config`, `configfile_processor`, `cli_configurator` | Schema-driven configuration, generated accessors, Lua config processing and command-line configuration. |
+| `src/ufsrv_core/command_console`, `src/ufsrv_console_script` | Command console registration and dispatch, including Lua scripting. |
+| `src/ufsrv_core/service`, `cache_backend`, `ratelimit_v2`, `instrumentation`, `system` | File loading, timer scheduling, backend interfaces, rate limiting, metrics and process utilities. |
 
-## Requirements
+Public headers live under `include/ufsrvcorelib/`. The [worker design](dev/technical_designs/1.%20UFSRV_DELEGATOR_TO_WORKER_DESIGN.md)
+covers pool startup, signalling and thread-local state.
 
-- C17 toolchain (Clang) and CMake ≥ 3.25
-- `uflib` (required)
-- Lua 5.4, json-c, jemalloc, systemd, OpenSSL, and a MariaDB client
-- `hiredis`, `csonpath` and `ufsrvscriptlib` are vendored under `packages/` and built in-source
-  by default; `ufsrvscriptlib` can also be supplied by `find_package()`
+## Dependencies
+
+- `uflib` provides low-level libraries such as the recycler, database helpers, and data structures.
+- Corelib links Lua, json-c, libcurl, OpenSSL, MariaDB, jemalloc, systemd and threads.
+- Hiredis, csonpath and ufsrvscriptlib are available under `packages/`.
+- Netcorelib builds on corelib. Core-only hosts can use the protocol, HTTP and OAuth modules directly.
 
 ## Build
 

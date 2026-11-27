@@ -50,9 +50,7 @@ static ConfFileSymbolTableEntry g_ufsrv_config_symbols[] = {
   { .scope = "ufsrv", .key = CONF_FILE_LITERAL_UFSRV_GEOGROUP,         .type = UFSRV_CONFIG_VALUE_INT, .value = {0}, .field_index = UFSRV_CONFIG_FIELD_COUNT, .description = "geographic routing group" },
 
   // Network listeners
-  { .scope = "ufsrv", .key = CONF_FILE_LITERAL_MAIN_LISTENER_PORT,           .type = UFSRV_CONFIG_VALUE_INT, .value = {0}, .field_index = UFSRV_CONFIG_FIELD_COUNT, .description = "TCP port for main listener" },
-  { .scope = "ufsrv", .key = CONF_FILE_LITERAL_MAIN_LISTENER_ADDRESS,        .type = UFSRV_CONFIG_VALUE_STR, .value = {0}, .field_index = UFSRV_CONFIG_FIELD_COUNT, .description = "bind address" },
-  { .scope = "ufsrv", .key = CONF_FILE_LITERAL_MAIN_LISTENER_PROTOCOL_ID,    .type = UFSRV_CONFIG_VALUE_INT, .value = {0}, .field_index = UFSRV_CONFIG_FIELD_COUNT, .description = "protocol id for main listener" },
+  { .scope = "ufsrv", .key = CONF_FILE_LITERAL_LISTENERS, .type = UFSRV_CONFIG_VALUE_COLLECTION, .field_index = UFSRV_CONFIG_FIELD_COUNT, .description = "configured TCP listeners" },
   { .scope = "ufsrv", .key = CONF_FILE_LITERAL_COMMAND_CONSOLE_PORT,         .type = UFSRV_CONFIG_VALUE_INT, .value = {0}, .field_index = UFSRV_CONFIG_FIELD_COUNT, .description = "TCP port for command console" },
   { .scope = "ufsrv", .key = CONF_FILE_LITERAL_COMMAND_CONSOLE_BIND_ADDRESS, .type = UFSRV_CONFIG_VALUE_STR, .value = {0}, .field_index = UFSRV_CONFIG_FIELD_COUNT, .description = "console bind address" },
 

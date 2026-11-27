@@ -1,11 +1,11 @@
 /*
  * ufsrv_config_getters_setters_generated.c — GENERATED, DO NOT EDIT
  *
- * Version:    64
- * Generated:  Sat Nov 14 18:43:04 2026
- * Generator:  d3a5e2999eee548a6b4085cdfceb7e4b3147be96
- * Catalogue:  230f5576d045ec937ddf358928b972cbd2b0f89e
- *   Config fields:   52
+ * Version:    67
+ * Generated:  Fri Nov 27 09:26:14 2026
+ * Generator:  aa42f0acec8015b8cfd0669182be202dd836212c
+ * Catalogue:  d4bb12e727d8ec36dff666a85d4d064353052fb3
+ *   Config fields:   50
  *   Runtime fields:  31
  */
 
@@ -27,16 +27,6 @@ UfsrvConfigValidate(void)
         if (_v < 0 || _v > 0) {
         UfsrvConfigResult r = { UFSRV_CONFIG_ERR_RANGE,
                                 "server_run_mode: out of range [0, 0]" };
-        return r;
-        }
-    }
-    // main_listener_port: range [1, 65535]
-    {
-        int64_t _v = UfsrvConfigConfFileValuesInstance(
-            UFSRV_CONFIG_FIELD_MAIN_LISTENER_PORT)->stored_value.int_val;
-        if (_v < 1 || _v > 65535) {
-        UfsrvConfigResult r = { UFSRV_CONFIG_ERR_RANGE,
-                                "main_listener_port: out of range [1, 65535]" };
         return r;
         }
     }

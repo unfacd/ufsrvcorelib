@@ -24,6 +24,7 @@
 
 #include <stddef.h>   /* size_t */
 #include <stdbool.h>
+#include <stdint.h>
 #include <uflib/main_types.h>
 #include <ufsrvcorelib/ufsrv_core/ufsrv_config/ufsrv_config_value_type.h>
 #include <ufsrvcorelib/ufsrv_core/ufsrv_config/pretty_print_format_enum.h>
@@ -76,8 +77,9 @@ typedef enum
   UFSRV_CONFIG_CHECK_IS_FILE             = 5, ///< string must be an existing regular file
   UFSRV_CONFIG_CHECK_IS_PERCENTAGE       = 6, ///< values expressing percentages as 1-100%
   UFSRV_CONFIG_CHECK_IS_IEC_BINARY_UNITS = 7, ///< standard IEC Binary (Base-2 / Multiples of 1024)
-  UFSRV_CONFIG_CHECK_ENUM_RANGE          = 8
+  UFSRV_CONFIG_CHECK_ENUM_RANGE          = 8,
   ///<if .value_type      = UFSRV_CONFIG_VALUE_ENUM, check the value is in the enum range for the declared type
+  UFSRV_CONFIG_CHECK_UINT32_RANGE        = 9
 } UfsrvConfigCheckType;
 
 /*! Range constraint for UFSRV_CONFIG_CHECK_RANGE. */
@@ -94,6 +96,11 @@ typedef struct
   union
   {
     UfsrvConfigRange range; ///< for UFSRV_CONFIG_CHECK_RANGE
+    struct
+    {
+      uint32_t min;
+      uint32_t max;
+    } uint32_range;
     /* path checks and not‑empty need no additional data */
   } check;
 } UfsrvConfigValidation;

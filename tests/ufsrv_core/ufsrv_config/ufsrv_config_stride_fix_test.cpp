@@ -218,7 +218,7 @@ TEST_F(StrideFixTest, GeneratedIntAccessors)
     printf("\n=== GENERATED INT ACCESSORS ===\n");
 
     // serverid         — CONFIG INT index 0
-    // main_listener_port — CONFIG INT index 5
+    // stats_backend_port — CONFIG INT index 5
     // command_console_port — CONFIG INT index 8
     // serverpid        — RUNTIME INT index 2
 
@@ -234,11 +234,11 @@ TEST_F(StrideFixTest, GeneratedIntAccessors)
     EXPECT_EQ(UfsrvConfigServerid(), 7777);
 
     item.value.stored_value.int_val = 19701;
-    UfsrvConfigSetMainListenerPort(&item, UFSRV_CONFIG_SOURCE_DEFAULTS);
-    printf("  UfsrvConfigMainListenerPort    set=19701 got=%d  %s\n",
-           UfsrvConfigMainListenerPort(),
-           UfsrvConfigMainListenerPort() == 19701 ? "OK" : "FAIL <<<");
-    EXPECT_EQ(UfsrvConfigMainListenerPort(), 19701);
+    UfsrvConfigSetStatsBackendPort(&item, UFSRV_CONFIG_SOURCE_DEFAULTS);
+    printf("  UfsrvConfigStatsBackendPort    set=19701 got=%d  %s\n",
+           UfsrvConfigStatsBackendPort(),
+           UfsrvConfigStatsBackendPort() == 19701 ? "OK" : "FAIL <<<");
+    EXPECT_EQ(UfsrvConfigStatsBackendPort(), 19701);
 
     item.value.stored_value.int_val = 5555;
     UfsrvConfigSetCommandConsolePort(&item, UFSRV_CONFIG_SOURCE_DEFAULTS);
@@ -321,8 +321,8 @@ TEST_F(StrideFixTest, DefaultsDumpAndRoundTrip)
     printf("  [ 0] serverid                          int_val=%5" PRId64 "\n",
            ufsrv_config_field_defaults_table[UFSRV_CONFIG_FIELD_SERVERID]
                .stored_value.int_val);
-    printf("  [ 5] main_listener_port                int_val=%5" PRId64 "\n",
-           ufsrv_config_field_defaults_table[UFSRV_CONFIG_FIELD_MAIN_LISTENER_PORT]
+    printf("  [ 5] stats_backend_port                int_val=%5" PRId64 "\n",
+           ufsrv_config_field_defaults_table[UFSRV_CONFIG_FIELD_STATS_BACKEND_PORT]
                .stored_value.int_val);
     printf("  [ 8] command_console_port              int_val=%5" PRId64 "\n",
            ufsrv_config_field_defaults_table[UFSRV_CONFIG_FIELD_COMMAND_CONSOLE_PORT]
@@ -362,9 +362,9 @@ TEST_F(StrideFixTest, DefaultsDumpAndRoundTrip)
     EXPECT_EQ(UfsrvConfigServerid(), 42);
 
     item.value.stored_value.int_val = 8080;
-    UfsrvConfigSetMainListenerPort(&item, UFSRV_CONFIG_SOURCE_DEFAULTS);
-    printf("  UfsrvConfigMainListenerPort    set=8080  got=%d  %s\n",
-           UfsrvConfigMainListenerPort(),
-           UfsrvConfigMainListenerPort() == 8080 ? "OK" : "FAIL <<<");
-    EXPECT_EQ(UfsrvConfigMainListenerPort(), 8080);
+    UfsrvConfigSetStatsBackendPort(&item, UFSRV_CONFIG_SOURCE_DEFAULTS);
+    printf("  UfsrvConfigStatsBackendPort    set=8080  got=%d  %s\n",
+           UfsrvConfigStatsBackendPort(),
+           UfsrvConfigStatsBackendPort() == 8080 ? "OK" : "FAIL <<<");
+    EXPECT_EQ(UfsrvConfigStatsBackendPort(), 8080);
 }

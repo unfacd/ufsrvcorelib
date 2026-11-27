@@ -22,9 +22,6 @@ ufsrv = {
     ufsrv_geogroup          = 3,
 
     -- ── Network listeners ────────────────────────────────────────────
-    main_listener_port           = 19701,
-    main_listener_bind_address   = "127.0.0.1",
-    main_listener_protocol_id    = 1,
     command_console_port         = 19700,
     command_console_bind_address = "127.0.0.1",
 

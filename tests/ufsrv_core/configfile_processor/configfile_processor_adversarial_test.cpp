@@ -416,7 +416,7 @@ TEST_F(ConfFileAttack, FormatSpecifierInKey) {
 /* ── INT attacks ──────────────────────────────────────────────────────── */
 
 TEST_F(ConfFileAttack, NegativePort) {
-  const char *lua = "ufsrv = { main_listener_port = -1 }\n";
+  const char *lua = "ufsrv = { command_console_port = -1 }\n";
   char tmpl[] = "/tmp/conf_attack_XXXXXX";
   int fd = mkstemp(tmpl);
   ASSERT_GE(fd, 0);
@@ -440,7 +440,7 @@ TEST_F(ConfFileAttack, NegativePort) {
   };
 
   static ConfFileSymbolTableEntry neg_sym[] = {
-    { .scope = "ufsrv", .key = "main_listener_port",
+    { .scope = "ufsrv", .key = "command_console_port",
       .type = UFSRV_CONFIG_VALUE_INT, .value = {0},
       .field_index = UFSRV_CONFIG_FIELD_COUNT, .description = "port",
       .lifecycle = { .on_validate = validate } },
@@ -456,7 +456,7 @@ TEST_F(ConfFileAttack, NegativePort) {
 }
 
 TEST_F(ConfFileAttack, Int64MaxValue) {
-  const char *lua = "ufsrv = { main_listener_port = 9223372036854775807 }\n";
+  const char *lua = "ufsrv = { command_console_port = 9223372036854775807 }\n";
   char tmpl[] = "/tmp/conf_attack_XXXXXX";
   int fd = mkstemp(tmpl);
   ASSERT_GE(fd, 0);
@@ -469,7 +469,7 @@ TEST_F(ConfFileAttack, Int64MaxValue) {
   unlink(tmpl);
 
   static ConfFileSymbolTableEntry big_sym[] = {
-    { .scope = "ufsrv", .key = "main_listener_port",
+    { .scope = "ufsrv", .key = "command_console_port",
       .type = UFSRV_CONFIG_VALUE_INT, .value = {0},
       .field_index = UFSRV_CONFIG_FIELD_COUNT, .description = "port",
       .lifecycle = { .on_validate = nullptr } },
@@ -809,7 +809,7 @@ TEST_F(ConfFileCoverage, GetStringOnIntField) {
   auto path = fixturePath("valid_full.lua");
   ConfFile cp = ConfFileInit(path.c_str());
   ASSERT_NE(cp, nullptr);
-  const char *v = ConfFileGetString(cp, "ufsrv", "main_listener_port");
+  const char *v = ConfFileGetString(cp, "ufsrv", "command_console_port");
   EXPECT_EQ(v, nullptr);
   EXPECT_EQ(ConfFileGetLastError(cp), CONF_FILE_ERR_TYPE_MISMATCH);
   ConfFileDestroy(cp);
@@ -829,7 +829,7 @@ TEST_F(ConfFileCoverage, GetBoolOnIntField) {
   auto path = fixturePath("valid_full.lua");
   ConfFile cp = ConfFileInit(path.c_str());
   ASSERT_NE(cp, nullptr);
-  bool v = ConfFileGetBool(cp, "ufsrv", "main_listener_port");
+  bool v = ConfFileGetBool(cp, "ufsrv", "command_console_port");
   EXPECT_FALSE(v);
   EXPECT_EQ(ConfFileGetLastError(cp), CONF_FILE_ERR_TYPE_MISMATCH);
   ConfFileDestroy(cp);
@@ -846,7 +846,7 @@ TEST_F(ConfFileCoverage, GetNumberOnStringField) {
 }
 
 TEST_F(ConfFileCoverage, GetIntWithFloatValue) {
-  const char *lua = "ufsrv = { main_listener_port = 3.14 }\n";
+  const char *lua = "ufsrv = { command_console_port = 3.14 }\n";
   char tmpl[] = "/tmp/conf_cov_XXXXXX";
   int fd = mkstemp(tmpl);
   ASSERT_GE(fd, 0);
@@ -858,7 +858,7 @@ TEST_F(ConfFileCoverage, GetIntWithFloatValue) {
   ASSERT_NE(cp, nullptr);
   unlink(tmpl);
 
-  int v = ConfFileGetInt(cp, "ufsrv", "main_listener_port");
+  int v = ConfFileGetInt(cp, "ufsrv", "command_console_port");
   EXPECT_EQ(v, 0);
   EXPECT_EQ(ConfFileGetLastError(cp), CONF_FILE_ERR_TYPE_MISMATCH);
   ConfFileDestroy(cp);
