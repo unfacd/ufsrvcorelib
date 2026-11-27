@@ -1,11 +1,11 @@
 /*
  * ufsrv_config_getters_setters_generated.c — GENERATED, DO NOT EDIT
  *
- * Version:    64
- * Generated:  Sat Nov 14 18:43:04 2026
- * Generator:  d3a5e2999eee548a6b4085cdfceb7e4b3147be96
- * Catalogue:  230f5576d045ec937ddf358928b972cbd2b0f89e
- *   Config fields:   52
+ * Version:    67
+ * Generated:  Fri Nov 27 09:26:14 2026
+ * Generator:  aa42f0acec8015b8cfd0669182be202dd836212c
+ * Catalogue:  d4bb12e727d8ec36dff666a85d4d064353052fb3
+ *   Config fields:   50
  *   Runtime fields:  31
  */
 
@@ -69,57 +69,6 @@ UfsrvConfigSetServerRunMode(UfsrvConfigItem *item, UfsrvConfigSource config_sour
     if (_entry->lifecycle.on_value_available)
         _entry->lifecycle.on_value_available(
             UFSRV_CONFIG_FIELD_SERVER_RUN_MODE, &item->value, config_source);
-}
-
-int
-UfsrvConfigMainListenerPort(void)
-{
-    return (int)UfsrvConfigConfFileValuesInstance(
-        UFSRV_CONFIG_FIELD_MAIN_LISTENER_PORT)->stored_value.int_val;
-}
-
-void
-UfsrvConfigSetMainListenerPort(UfsrvConfigItem *item, UfsrvConfigSource config_source)
-{
-    UfsrvConfigFieldEntry *_entry = UfsrvConfigConfFileStoreInstance(
-        UFSRV_CONFIG_FIELD_MAIN_LISTENER_PORT);
-    if (_entry->lifecycle.on_value_available)
-        _entry->lifecycle.on_value_available(
-            UFSRV_CONFIG_FIELD_MAIN_LISTENER_PORT, &item->value, config_source);
-}
-
-char *
-UfsrvConfigMainListenerAddress(void)
-{
-    return UfsrvConfigConfFileValuesInstance(
-        UFSRV_CONFIG_FIELD_MAIN_LISTENER_ADDRESS)->stored_value.str_val;
-}
-
-void
-UfsrvConfigSetMainListenerAddress(UfsrvConfigItem *item, UfsrvConfigSource config_source)
-{
-    UfsrvConfigFieldEntry *_entry = UfsrvConfigConfFileStoreInstance(
-        UFSRV_CONFIG_FIELD_MAIN_LISTENER_ADDRESS);
-    if (_entry->lifecycle.on_value_available)
-        _entry->lifecycle.on_value_available(
-            UFSRV_CONFIG_FIELD_MAIN_LISTENER_ADDRESS, &item->value, config_source);
-}
-
-unsigned
-UfsrvConfigMainListenerProtocolId(void)
-{
-    return (unsigned)UfsrvConfigConfFileValuesInstance(
-        UFSRV_CONFIG_FIELD_MAIN_LISTENER_PROTOCOL_ID)->stored_value.int_val;
-}
-
-void
-UfsrvConfigSetMainListenerProtocolId(UfsrvConfigItem *item, UfsrvConfigSource config_source)
-{
-    UfsrvConfigFieldEntry *_entry = UfsrvConfigConfFileStoreInstance(
-        UFSRV_CONFIG_FIELD_MAIN_LISTENER_PROTOCOL_ID);
-    if (_entry->lifecycle.on_value_available)
-        _entry->lifecycle.on_value_available(
-            UFSRV_CONFIG_FIELD_MAIN_LISTENER_PROTOCOL_ID, &item->value, config_source);
 }
 
 int
@@ -936,6 +885,28 @@ UfsrvConfigSetEmailApiUrl(UfsrvConfigItem *item, UfsrvConfigSource config_source
             UFSRV_CONFIG_FIELD_EMAIL_API_URL, &item->value, config_source);
 }
 
+CollectionDescriptor
+UfsrvConfigListeners(void)
+{
+    return *(const CollectionDescriptor *)UfsrvConfigConfFileValuesInstance(
+        UFSRV_CONFIG_FIELD_LISTENERS)->stored_value.blob_val;
+}
+
+CollectionDescriptor *
+UfsrvConfigListenersAsPtr(void)
+{
+    return (CollectionDescriptor *)UfsrvConfigConfFileValuesInstance(
+        UFSRV_CONFIG_FIELD_LISTENERS)->stored_value.blob_val;
+}
+
+void
+UfsrvConfigListenersSetter(int field_index, const UfsrvConfigValue *value_ptr, UfsrvConfigSource source)
+{
+    (void)field_index;
+    UfsrvConfigItem item = { .layer = source, .value = *value_ptr };
+    UfsrvConfigSetListeners(&item, source);
+}
+
 // Runtime accessors
 
 enum UfsrvConfigStoreOperatingState
@@ -1619,24 +1590,6 @@ UfsrvConfigSslSupportAsString(int field_index, UfsrvConfigValue *value_ptr, Buff
 }
 
 BufferDescriptor *
-UfsrvConfigMainListenerPortAsString(int field_index, UfsrvConfigValue *value_ptr, BufferDescriptor *buffer_provided)
-{
-    return GenericIntAsString(field_index, value_ptr, buffer_provided);
-}
-
-BufferDescriptor *
-UfsrvConfigMainListenerAddressAsString(int field_index, UfsrvConfigValue *value_ptr, BufferDescriptor *buffer_provided)
-{
-    return GenericCharPtrAsString(field_index, value_ptr, buffer_provided);
-}
-
-BufferDescriptor *
-UfsrvConfigMainListenerProtocolIdAsString(int field_index, UfsrvConfigValue *value_ptr, BufferDescriptor *buffer_provided)
-{
-    return GenericUnsignedAsString(field_index, value_ptr, buffer_provided);
-}
-
-BufferDescriptor *
 UfsrvConfigCommandConsolePortAsString(int field_index, UfsrvConfigValue *value_ptr, BufferDescriptor *buffer_provided)
 {
     return GenericIntAsString(field_index, value_ptr, buffer_provided);
@@ -2018,4 +1971,10 @@ BufferDescriptor *
 UfsrvConfigEmailApiUrlAsString(int field_index, UfsrvConfigValue *value_ptr, BufferDescriptor *buffer_provided)
 {
     return GenericCharPtrAsString(field_index, value_ptr, buffer_provided);
+}
+
+BufferDescriptor *
+UfsrvConfigListenersAsString(int field_index, UfsrvConfigValue *value_ptr, BufferDescriptor *buffer_provided)
+{
+    return UfsrvConfigListenersAsString_CollectionDescriptor(field_index, value_ptr, buffer_provided);
 }

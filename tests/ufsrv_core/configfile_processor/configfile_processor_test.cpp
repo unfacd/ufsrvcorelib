@@ -155,7 +155,7 @@ protected:
   void SetUp() override {
     // Create a minimal config with ufsrv scope
     auto path = sWriteTempFile(
-        "ufsrv = { server_run_mode = \"shadow\", main_listener_port = 19701, "
+        "ufsrv = { server_run_mode = \"shadow\", command_console_port = 19701, "
         "ufsrv_geogroup = 3, server_id = 1 }\n");
     ASSERT_FALSE(path.empty());
     cp = ConfFileInit(path.c_str());
@@ -189,7 +189,7 @@ TEST_F(ConfFileStringTest, GetStringMissingKey) {
 }
 
 TEST_F(ConfFileStringTest, GetStringTypeMismatch) {
-  const char *val = ConfFileGetString(cp, "ufsrv", "main_listener_port");
+  const char *val = ConfFileGetString(cp, "ufsrv", "command_console_port");
   EXPECT_EQ(val, nullptr);
   EXPECT_EQ(ConfFileGetLastError(cp), CONF_FILE_ERR_TYPE_MISMATCH);
 }
@@ -228,7 +228,7 @@ TEST_F(ConfFileStringTest, GetStringCopySmallBuf) {
    ════════════════════════════════════════════════════════════════════════ */
 
 TEST_F(ConfFileStringTest, GetIntValid) {
-  int val = ConfFileGetInt(cp, "ufsrv", "main_listener_port");
+  int val = ConfFileGetInt(cp, "ufsrv", "command_console_port");
   EXPECT_EQ(val, 19701);
   EXPECT_EQ(ConfFileGetLastError(cp), CONF_FILE_OK);
 }
@@ -266,14 +266,14 @@ TEST_F(ConfFileStringTest, GetIntGenuineZero) {
    ════════════════════════════════════════════════════════════════════════ */
 
 TEST_F(ConfFileStringTest, GetNumberValid) {
-  double val = ConfFileGetNumber(cp, "ufsrv", "main_listener_port");
+  double val = ConfFileGetNumber(cp, "ufsrv", "command_console_port");
   EXPECT_DOUBLE_EQ(val, 19701.0);
   EXPECT_EQ(ConfFileGetLastError(cp), CONF_FILE_OK);
 }
 
 TEST_F(ConfFileStringTest, GetBoolValid) {
   // Our fixture doesn't have a boolean — test with a temp config
-  auto path = sWriteTempFile("ufsrv = { ufsrv_geogroup = 3, main_listener_port = 19701, enabled = true }\n");
+  auto path = sWriteTempFile("ufsrv = { ufsrv_geogroup = 3, command_console_port = 19701, enabled = true }\n");
   ASSERT_FALSE(path.empty());
   ConfFile cp2 = ConfFileInit(path.c_str());
   ASSERT_NE(cp2, nullptr);
@@ -286,7 +286,7 @@ TEST_F(ConfFileStringTest, GetBoolValid) {
 }
 
 TEST_F(ConfFileStringTest, GetBoolFalse) {
-  auto path = sWriteTempFile("ufsrv = { ufsrv_geogroup = 3, main_listener_port = 19701, enabled = false }\n");
+  auto path = sWriteTempFile("ufsrv = { ufsrv_geogroup = 3, command_console_port = 19701, enabled = false }\n");
   ASSERT_FALSE(path.empty());
   ConfFile cp2 = ConfFileInit(path.c_str());
   ASSERT_NE(cp2, nullptr);
@@ -299,7 +299,7 @@ TEST_F(ConfFileStringTest, GetBoolFalse) {
 }
 
 TEST_F(ConfFileStringTest, GetBoolTypeMismatch) {
-  bool val = ConfFileGetBool(cp, "ufsrv", "main_listener_port");
+  bool val = ConfFileGetBool(cp, "ufsrv", "command_console_port");
   EXPECT_FALSE(val);
   EXPECT_EQ(ConfFileGetLastError(cp), CONF_FILE_ERR_TYPE_MISMATCH);
 }
@@ -310,7 +310,7 @@ TEST_F(ConfFileStringTest, GetBoolTypeMismatch) {
 
 TEST(ConfFileTableArray, IsTable) {
   auto path = sWriteTempFile(
-      "ufsrv = { ufsrv_geogroup=3, main_listener_port=19701, "
+      "ufsrv = { ufsrv_geogroup=3, command_console_port=19701, "
       "user_timeouts = { unauthenticated_timeout = 60 } }\n");
   ASSERT_FALSE(path.empty());
   ConfFile cp = ConfFileInit(path.c_str());
@@ -318,7 +318,7 @@ TEST(ConfFileTableArray, IsTable) {
   unlink(path.c_str());
 
   EXPECT_TRUE(ConfFileIsTable(cp, "ufsrv", "user_timeouts"));
-  EXPECT_FALSE(ConfFileIsTable(cp, "ufsrv", "main_listener_port"));
+  EXPECT_FALSE(ConfFileIsTable(cp, "ufsrv", "command_console_port"));
   EXPECT_FALSE(ConfFileIsTable(cp, "ufsrv", "nonexistent"));
   ConfFileDestroy(cp);
 }
@@ -421,7 +421,7 @@ TEST(ConfFileDiscovery, NextScope) {
 
 TEST(ConfFileDiscovery, NextKey) {
   auto path = sWriteTempFile(
-      "ufsrv = { ufsrv_geogroup = 3, main_listener_port = 19701, server_id = 1 }\n");
+      "ufsrv = { ufsrv_geogroup = 3, command_console_port = 19701, server_id = 1 }\n");
   ASSERT_FALSE(path.empty());
   ConfFile cp = ConfFileInit(path.c_str());
   ASSERT_NE(cp, nullptr);
@@ -456,7 +456,7 @@ static bool sValidatePort(const ConfFileSymbolTableEntry *entry,
 }
 
 static ConfFileSymbolTableEntry g_test_symbols[] = {
-  { .scope = "ufsrv", .key = "main_listener_port",
+  { .scope = "ufsrv", .key = "command_console_port",
     .type = UFSRV_CONFIG_VALUE_INT, .value = {0},
     .field_index = UFSRV_CONFIG_FIELD_COUNT,
     .description = "test port",
@@ -471,7 +471,7 @@ static ConfFileSymbolTableEntry g_test_symbols[] = {
 
 TEST(ConfFileSymbolTable, ResolveSymbolsBasic) {
   auto path = sWriteTempFile(
-      "ufsrv = { ufsrv_geogroup=3, main_listener_port=19701, "
+      "ufsrv = { ufsrv_geogroup=3, command_console_port=19701, "
       "server_run_mode=\"shadow\" }\n");
   ASSERT_FALSE(path.empty());
   ConfFile cp = ConfFileInit(path.c_str());
@@ -490,9 +490,40 @@ TEST(ConfFileSymbolTable, ResolveSymbolsBasic) {
   ConfFileDestroy(cp);
 }
 
+TEST(ConfFileSymbolTable, TransfersNestedRestTlsValues) {
+  auto path = sWriteTempFile(
+      "return { ufsrvsfu = { rest_server = { tls = { "
+      "is_enabled = true, certificate_file = 'rest-chain.pem', "
+      "private_key = 'enc:v1:test-envelope' } } } }");
+  ASSERT_FALSE(path.empty());
+  ConfFile cp = ConfFileInit(path.c_str());
+  unlink(path.c_str());
+  ASSERT_NE(cp, nullptr);
+
+  ConfFileSymbolTableEntry symbols[] = {
+    { .scope = "ufsrvsfu", .key = "rest_server.tls.is_enabled",
+      .type = UFSRV_CONFIG_VALUE_BOOL },
+    { .scope = "ufsrvsfu", .key = "rest_server.tls.certificate_file",
+      .type = UFSRV_CONFIG_VALUE_STR },
+    { .scope = "ufsrvsfu", .key = "rest_server.tls.private_key",
+      .type = UFSRV_CONFIG_VALUE_STR },
+    { .scope = nullptr }
+  };
+  EXPECT_EQ(ConfFileTransferToConfigValues(cp, symbols, nullptr, 0, nullptr), 0);
+  EXPECT_EQ(symbols[0].value.stored_value.int_val, 1);
+  EXPECT_STREQ(symbols[1].value.stored_value.str_val, "rest-chain.pem");
+  EXPECT_STREQ(symbols[2].value.stored_value.str_val, "enc:v1:test-envelope");
+  for (size_t i = 0; i < 3; ++i)
+    EXPECT_EQ(symbols[i].value.source, UFSRV_CONFIG_SOURCE_CONFIG_FILE);
+
+  free(symbols[1].value.stored_value.str_val);
+  free(symbols[2].value.stored_value.str_val);
+  ConfFileDestroy(cp);
+}
+
 TEST(ConfFileSymbolTable, ResolveMissingKeyReportsError) {
   auto path = sWriteTempFile(
-      "ufsrv = { ufsrv_geogroup = 3, main_listener_port = 4444 }\n");
+      "ufsrv = { ufsrv_geogroup = 3, command_console_port = 4444 }\n");
   ASSERT_FALSE(path.empty());
   ConfFile cp = ConfFileInit(path.c_str());
   ASSERT_NE(cp, nullptr);
@@ -512,7 +543,7 @@ TEST(ConfFileSymbolTable, ResolveMissingKeyReportsError) {
 
 TEST(ConfFileSymbolTable, ResolveValidationFailure) {
   auto path = sWriteTempFile(
-      "ufsrv = { ufsrv_geogroup=3, main_listener_port=0, "
+      "ufsrv = { ufsrv_geogroup=3, command_console_port=0, "
       "server_run_mode=\"shadow\" }\n");  // port 0 is invalid
   ASSERT_FALSE(path.empty());
   ConfFile cp = ConfFileInit(path.c_str());
@@ -534,7 +565,7 @@ TEST(ConfFileSymbolTable, ResolveValidationFailure) {
 TEST(ConfFileDumpJson, BasicDump) {
   // Populate e->value via ResolveSymbols, then serialise
   auto path = sWriteTempFile(
-      "ufsrv = { ufsrv_geogroup=3, main_listener_port=19701, "
+      "ufsrv = { ufsrv_geogroup=3, command_console_port=19701, "
       "server_run_mode=\"shadow\" }\n");
   ASSERT_FALSE(path.empty());
   ConfFile cp = ConfFileInit(path.c_str());
@@ -573,7 +604,7 @@ TEST(ConfFileDumpJson, NullPath) {
 
 TEST(ConfFileStack, SequentialAccess) {
   auto path = sWriteTempFile(
-      "ufsrv = { ufsrv_geogroup=3, main_listener_port=19701, "
+      "ufsrv = { ufsrv_geogroup=3, command_console_port=19701, "
       "server_run_mode=\"shadow\", server_id=1 }\n");
   ASSERT_FALSE(path.empty());
   ConfFile cp = ConfFileInit(path.c_str());
@@ -584,7 +615,7 @@ TEST(ConfFileStack, SequentialAccess) {
   for (int i = 0; i < 100; i++) {
     const char *s = ConfFileGetString(cp, "ufsrv", "server_run_mode");
     EXPECT_STREQ(s, "shadow");
-    int v = ConfFileGetInt(cp, "ufsrv", "main_listener_port");
+    int v = ConfFileGetInt(cp, "ufsrv", "command_console_port");
     EXPECT_EQ(v, 19701);
   }
   EXPECT_EQ(ConfFileGetLastError(cp), CONF_FILE_OK);

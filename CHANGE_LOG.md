@@ -1,5 +1,23 @@
 # Change Log — ufsrvcorelib
 
+## Release-261127 — 2.0.0
+`0ba9647` → `6f4f8f1` · 2026-11-15 → 2026-11-27
+
+### New
+- **SFU media server** — SFU in a box: nearly full implementation of typical lightweight server with built-in signalling mode
+- **STUN/TURN** — STUN/TURN in a box:  very functional implementation
+- **HTTP and REST** — the HTTP server layer moved here from `ufnetcorelib`, with inbound parsing and session state
+- **Configuration** — Lua lookups walk dotted paths into nested tables, typed listener collections, unsigned 32-bit range validators, schema nodes accept a `validate` callback, and new literals cover `sfu`, `rest_server`, `turn` and `rooms`
+- **JWT and OAuth** — the runtime moved into core, Ed25519 public keys are extracted from PEM, and stored revocation state is enforced on introspection
+- **Core absorption** — the delegator transport, the session partition type, workers, cache, the rate limiter, listener signal setup and the console transport now live here
+
+### Fixes
+
+### Deprecated
+- (none)
+
+### Removed
+
 ## Release-261115 — 1.9.24
 `4ec9cf8` → `d3e6333` · 2026-07-16 → 2026-11-15
 

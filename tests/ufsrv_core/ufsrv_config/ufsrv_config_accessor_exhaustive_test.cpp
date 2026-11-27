@@ -148,9 +148,6 @@ static const CfgFieldInfo kCfgFields[] = {
     CFG_ENTRY(INTRA_UFSRV_CLASSNAME,                  IntraUfsrvClassname),
     CFG_ENTRY(UFSRV_GEOGROUP,                         UfsrvGeogroup),
     CFG_ENTRY(SERVER_RUN_MODE,                        ServerRunMode),
-    CFG_ENTRY(MAIN_LISTENER_PORT,                     MainListenerPort),
-    CFG_ENTRY(MAIN_LISTENER_ADDRESS,                  MainListenerAddress),
-    CFG_ENTRY(MAIN_LISTENER_PROTOCOL_ID,              MainListenerProtocolId),
     CFG_ENTRY(COMMAND_CONSOLE_PORT,                   CommandConsolePort),
     CFG_ENTRY(COMMAND_CONSOLE_ADDRESS,                CommandConsoleAddress),
     CFG_ENTRY(SERVER_CPU_AFFINITY,                    ServerCpuAffinity),
@@ -725,8 +722,8 @@ TEST_F(AccessorExhaustiveTest, ConfigGetterCrossCheck)
     EXPECT_EQ(UfsrvConfigServerid(), 1111);
 
     item.value.stored_value.int_val = 2222;
-    UfsrvConfigSetMainListenerPort(&item, UFSRV_CONFIG_SOURCE_DEFAULTS);
-    EXPECT_EQ(UfsrvConfigMainListenerPort(), 2222);
+    UfsrvConfigSetStatsBackendPort(&item, UFSRV_CONFIG_SOURCE_DEFAULTS);
+    EXPECT_EQ(UfsrvConfigStatsBackendPort(), 2222);
 
     item.value.stored_value.int_val = 3333;
     UfsrvConfigSetCommandConsolePort(&item, UFSRV_CONFIG_SOURCE_DEFAULTS);
@@ -1079,19 +1076,19 @@ TEST_F(InflateDeflateLifecycleTest, T1_DoubleInflateLeak)
 TEST_F(InflateDeflateLifecycleTest, T2_DeflateThenInflateCorrectness)
 {
     /* main_listener_address — CONFIG STR, idx 6, alloc_sz=257 */
-    InflateConfig(UFSRV_CONFIG_FIELD_MAIN_LISTENER_ADDRESS, false);
+    InflateConfig(UFSRV_CONFIG_FIELD_COMMAND_CONSOLE_ADDRESS, false);
 
     char *slot = UfsrvConfigConfFileValuesInstance(
-        UFSRV_CONFIG_FIELD_MAIN_LISTENER_ADDRESS)->stored_value.str_val;
+        UFSRV_CONFIG_FIELD_COMMAND_CONSOLE_ADDRESS)->stored_value.str_val;
     ASSERT_NE(slot, nullptr);
     void *old_ptr = slot;
     snprintf(slot, 257, "%s", "OLD_DATA_STRING");
 
     /* Deflate + re-inflate */
-    InflateConfig(UFSRV_CONFIG_FIELD_MAIN_LISTENER_ADDRESS, true);
+    InflateConfig(UFSRV_CONFIG_FIELD_COMMAND_CONSOLE_ADDRESS, true);
 
     char *new_slot = UfsrvConfigConfFileValuesInstance(
-        UFSRV_CONFIG_FIELD_MAIN_LISTENER_ADDRESS)->stored_value.str_val;
+        UFSRV_CONFIG_FIELD_COMMAND_CONSOLE_ADDRESS)->stored_value.str_val;
     ASSERT_NE(new_slot, nullptr);
     void *new_ptr = new_slot;
 
@@ -1440,24 +1437,24 @@ TEST_F(InflateDeflateLifecycleTest, T11_TripleInflate)
     /* main_listener_address — CONFIG STR, idx 6, alloc_sz=257 */
 
     /* 1st: bootstrap */
-    InflateConfig(UFSRV_CONFIG_FIELD_MAIN_LISTENER_ADDRESS, false);
+    InflateConfig(UFSRV_CONFIG_FIELD_COMMAND_CONSOLE_ADDRESS, false);
     char *b1 = UfsrvConfigConfFileValuesInstance(
-        UFSRV_CONFIG_FIELD_MAIN_LISTENER_ADDRESS)->stored_value.str_val;
+        UFSRV_CONFIG_FIELD_COMMAND_CONSOLE_ADDRESS)->stored_value.str_val;
     ASSERT_NE(b1, nullptr);
     snprintf(b1, 257, "%s", "buf1");
 
     /* 2nd: deflate + re-inflate */
-    InflateConfig(UFSRV_CONFIG_FIELD_MAIN_LISTENER_ADDRESS, true);
+    InflateConfig(UFSRV_CONFIG_FIELD_COMMAND_CONSOLE_ADDRESS, true);
     char *b2 = UfsrvConfigConfFileValuesInstance(
-        UFSRV_CONFIG_FIELD_MAIN_LISTENER_ADDRESS)->stored_value.str_val;
+        UFSRV_CONFIG_FIELD_COMMAND_CONSOLE_ADDRESS)->stored_value.str_val;
     ASSERT_NE(b2, nullptr);
     EXPECT_NE(static_cast<void *>(b2), static_cast<void *>(b1));
     snprintf(b2, 257, "%s", "buf2");
 
     /* 3rd: deflate + re-inflate again — must NOT double-free */
-    InflateConfig(UFSRV_CONFIG_FIELD_MAIN_LISTENER_ADDRESS, true);
+    InflateConfig(UFSRV_CONFIG_FIELD_COMMAND_CONSOLE_ADDRESS, true);
     char *b3 = UfsrvConfigConfFileValuesInstance(
-        UFSRV_CONFIG_FIELD_MAIN_LISTENER_ADDRESS)->stored_value.str_val;
+        UFSRV_CONFIG_FIELD_COMMAND_CONSOLE_ADDRESS)->stored_value.str_val;
     ASSERT_NE(b3, nullptr);
     EXPECT_NE(static_cast<void *>(b3), static_cast<void *>(b2));
     snprintf(b3, 257, "%s", "buf3");

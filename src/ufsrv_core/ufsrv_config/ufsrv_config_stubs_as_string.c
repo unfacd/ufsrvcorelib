@@ -8,15 +8,63 @@
 #include <uflib/collection_descriptor_type.h>
 #include <uflib/utils_collection_str.h>
 #include <uflib/logger/logger.h>
+#include <json-c/json.h>
 
 #include <stdbool.h>
 
 #include "ufsrv_config_stubs_as_string_priv.h"
+#include <ufsrvcorelib/ufsrv_core/delegator_sessions/ufsrv_listener_descriptor_type.h>
 #include <ufsrvcorelib/ufsrv_core/system/cpu_affinity_policy_enum.h>
 #include <ufsrvcorelib/ufsrv_core/system/server_run_mode_enum.h>
 #include <ufsrvcorelib/ufsrv_core/system/server_process_mode_enum.h>
 #include <ufsrvcorelib/ufsrv_core/ufsrv_config/ufsrv_config_store_operating_state_enum.h>
 #include "ufsrv_config_generic_callbacks_priv.h"
+
+static bool
+sAddListenerJsonField(json_object *record, const char *key, json_object *value)
+{
+  if (!value) return false;
+  if (json_object_object_add(record, key, value) == 0) return true;
+  json_object_put(value);
+  return false;
+}
+
+BufferDescriptor *
+UfsrvConfigListenersAsString_CollectionDescriptor(int field_index, UfsrvConfigValue *value_ptr, BufferDescriptor *buffer_provided)
+{
+  (void)field_index;
+  if (!buffer_provided || !value_ptr) return NULL;
+  const CollectionDescriptor *list = value_ptr->stored_value.blob_val;
+  json_object *array = json_object_new_array();
+  if (!array || (list && list->collection_sz && !list->collection)) goto error;
+
+  for (size_t i = 0; list && i < list->collection_sz; ++i) {
+    const UfsrvListenerDescriptor *listener = list->collection[i];
+    if (!listener || !listener->name || !listener->bind_address ||
+        !listener->protocol_key) goto error;
+
+    json_object *record = json_object_new_object();
+    if (!record) goto error;
+    if (!sAddListenerJsonField(record, "name", json_object_new_string(listener->name)) ||
+        !sAddListenerJsonField(record, "address", json_object_new_string(listener->bind_address)) ||
+        !sAddListenerJsonField(record, "port", json_object_new_int(listener->port)) ||
+        !sAddListenerJsonField(record, "protocol", json_object_new_string(listener->protocol_key)) ||
+        json_object_array_add(array, record) != 0) {
+      json_object_put(record);
+      goto error;
+    }
+  }
+
+  const char *json = json_object_to_json_string_ext(array, JSON_C_TO_STRING_PLAIN);
+  if (!json || BufferDescriptorAppendFormatted(buffer_provided, "%s", json) != 0) goto error;
+  json_object_put(array);
+  return buffer_provided;
+
+error:
+  json_object_put(array);
+  BufferDescriptorRelease(buffer_provided);
+  return NULL;
+}
 
 BufferDescriptor *
 UfsrvConfigConfFileStoreOperatingStateAsString_enum_UfsrvConfigStoreOperatingState(int field_index, UfsrvConfigValue *value_ptr, BufferDescriptor *buffer_provided)

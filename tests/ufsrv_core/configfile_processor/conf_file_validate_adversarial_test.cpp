@@ -86,7 +86,7 @@ static const char *kVValidatorPass =
 
 /* Minimal config: one ufsrv scope, one int key. */
 static const char *kConfigOneInt =
-  "return { ufsrv = { main_listener_port = 8080 } }\n";
+  "return { ufsrv = { command_console_port = 8080 } }\n";
 
 /* ── Fixture ─────────────────────────────────────────────────────────────── */
 
@@ -281,7 +281,7 @@ TEST_F(ConfFileValidateAdversarialTest, ValidatorReceivesRealConfigTable)
   std::string v   = sWriteTempFile(
       "function validate_config(c, s, a)\n"
       "  if c.ufsrv == nil then error('ufsrv scope missing from config') end\n"
-      "  if c.ufsrv.main_listener_port ~= 8080 then error('main_listener_port not passed') end\n"
+      "  if c.ufsrv.command_console_port ~= 8080 then error('command_console_port not passed') end\n"
       "  return true\n"
       "end\n");
   int rc = ConfFileValidate(cfg.c_str(), "core.lua", nullptr, v.c_str(),
@@ -329,10 +329,10 @@ TEST_F(ConfFileValidateAdversarialTest, SymbolsMissingKeyCountsFailure)
 TEST_F(ConfFileValidateAdversarialTest, SymbolsTypeMismatchCountsFailure)
 {
   std::string cfg = sWriteTempFile(
-      "return { ufsrv = { main_listener_port = 'not a number' } }\n");
+      "return { ufsrv = { command_console_port = 'not a number' } }\n");
   std::string v   = sWriteTempFile(kVValidatorPass);
   std::vector<ConfFileSymbolTableEntry> syms;
-  syms.push_back(sMakeEntry("ufsrv", "main_listener_port", UFSRV_CONFIG_VALUE_INT));
+  syms.push_back(sMakeEntry("ufsrv", "command_console_port", UFSRV_CONFIG_VALUE_INT));
   syms.push_back(sMakeEntry(nullptr, nullptr, UFSRV_CONFIG_VALUE_TYPE_UNSPECIFIED));
 
   int rc = ConfFileValidate(cfg.c_str(), "core.lua", nullptr, v.c_str(),
@@ -347,7 +347,7 @@ TEST_F(ConfFileValidateAdversarialTest, SymbolsResolvedOkReturnsZero)
   std::string cfg = sWriteTempFile(kConfigOneInt);
   std::string v   = sWriteTempFile(kVValidatorPass);
   std::vector<ConfFileSymbolTableEntry> syms;
-  syms.push_back(sMakeEntry("ufsrv", "main_listener_port", UFSRV_CONFIG_VALUE_INT));
+  syms.push_back(sMakeEntry("ufsrv", "command_console_port", UFSRV_CONFIG_VALUE_INT));
   syms.push_back(sMakeEntry(nullptr, nullptr, UFSRV_CONFIG_VALUE_TYPE_UNSPECIFIED));
 
   int rc = ConfFileValidate(cfg.c_str(), "core.lua", nullptr, v.c_str(),
@@ -363,7 +363,7 @@ TEST_F(ConfFileValidateAdversarialTest, NullAssociativeMapWithSymbolsDoesNotCras
   std::string cfg = sWriteTempFile(kConfigOneInt);
   std::string v   = sWriteTempFile(kVValidatorPass);
   std::vector<ConfFileSymbolTableEntry> syms;
-  syms.push_back(sMakeEntry("ufsrv", "main_listener_port", UFSRV_CONFIG_VALUE_INT));
+  syms.push_back(sMakeEntry("ufsrv", "command_console_port", UFSRV_CONFIG_VALUE_INT));
   syms.push_back(sMakeEntry(nullptr, nullptr, UFSRV_CONFIG_VALUE_TYPE_UNSPECIFIED));
 
   int rc = ConfFileValidate(cfg.c_str(), "core.lua", nullptr, v.c_str(),
@@ -379,7 +379,7 @@ TEST_F(ConfFileValidateAdversarialTest, NullMapNonzeroSzIsIgnored)
   std::string cfg = sWriteTempFile(kConfigOneInt);
   std::string v   = sWriteTempFile(kVValidatorPass);
   std::vector<ConfFileSymbolTableEntry> syms;
-  syms.push_back(sMakeEntry("ufsrv", "main_listener_port", UFSRV_CONFIG_VALUE_INT));
+  syms.push_back(sMakeEntry("ufsrv", "command_console_port", UFSRV_CONFIG_VALUE_INT));
   syms.push_back(sMakeEntry(nullptr, nullptr, UFSRV_CONFIG_VALUE_TYPE_UNSPECIFIED));
 
   int rc = ConfFileValidate(cfg.c_str(), "core.lua", nullptr, v.c_str(),
@@ -416,7 +416,7 @@ TEST_F(ConfFileValidateAdversarialTest, FindingCallbackReceivesNonNullFields)
 TEST_F(ConfFileValidateAdversarialTest, RealValidatorAcceptsValidConfig)
 {
   std::string cfg = sWriteTempFile(
-      "return { ufsrv = { ufsrv_geogroup = 1, main_listener_port = 8080, sys_runtime = {} } }\n");
+      "return { ufsrv = { ufsrv_geogroup = 1, command_console_port = 8080, sys_runtime = {} } }\n");
   std::string validator   = std::string(CMAKE_SOURCE_DIR) + "/etc/core_schema_validator.lua";
   std::string core_schema = std::string(CMAKE_SOURCE_DIR) + "/etc/core_schema_ufsrv.lua";
   int rc = ConfFileValidate(cfg.c_str(), core_schema.c_str(), nullptr, validator.c_str(),
@@ -430,7 +430,7 @@ TEST_F(ConfFileValidateAdversarialTest, RealValidatorRejectsMissingRequiredField
 {
   /* ufsrv_geogroup is required in the core schema but omitted here. */
   std::string cfg = sWriteTempFile(
-      "return { ufsrv = { main_listener_port = 8080, sys_runtime = {} } }\n");
+      "return { ufsrv = { command_console_port = 8080, sys_runtime = {} } }\n");
   std::string validator   = std::string(CMAKE_SOURCE_DIR) + "/etc/core_schema_validator.lua";
   std::string core_schema = std::string(CMAKE_SOURCE_DIR) + "/etc/core_schema_ufsrv.lua";
   int rc = ConfFileValidate(cfg.c_str(), core_schema.c_str(), nullptr, validator.c_str(),
@@ -444,7 +444,7 @@ TEST_F(ConfFileValidateAdversarialTest, RealValidatorRejectsMissingRequiredField
 TEST_F(ConfFileValidateAdversarialTest, RealValidatorRejectsTypeMismatch)
 {
   std::string cfg = sWriteTempFile(
-      "return { ufsrv = { ufsrv_geogroup = 1, main_listener_port = 'not a port', sys_runtime = {} } }\n");
+      "return { ufsrv = { ufsrv_geogroup = 1, command_console_port = 'not a port', sys_runtime = {} } }\n");
   std::string validator   = std::string(CMAKE_SOURCE_DIR) + "/etc/core_schema_validator.lua";
   std::string core_schema = std::string(CMAKE_SOURCE_DIR) + "/etc/core_schema_ufsrv.lua";
   int rc = ConfFileValidate(cfg.c_str(), core_schema.c_str(), nullptr, validator.c_str(),
@@ -452,7 +452,7 @@ TEST_F(ConfFileValidateAdversarialTest, RealValidatorRejectsTypeMismatch)
   sRemoveFile(cfg);
   EXPECT_EQ(rc, 1);
   ASSERT_GE(g_findings.size(), 1u);
-  EXPECT_NE(g_findings[0].message.find("main_listener_port"), std::string::npos);
+  EXPECT_NE(g_findings[0].message.find("command_console_port"), std::string::npos);
 }
 
 /* Shared helper: run ConfFileValidate against the real validator + core schema. */
@@ -470,25 +470,25 @@ sRealValidate(const char *config_lua)
 
 TEST_F(ConfFileValidateAdversarialTest, RealValidatorRejectsValueBelowMin)
 {
-  int rc = sRealValidate("return { ufsrv = { ufsrv_geogroup = 1, main_listener_port = 0, sys_runtime = {} } }\n");
+  int rc = sRealValidate("return { ufsrv = { ufsrv_geogroup = 1, command_console_port = 0, sys_runtime = {} } }\n");
   EXPECT_EQ(rc, 1);
   ASSERT_GE(g_findings.size(), 1u);
-  EXPECT_NE(g_findings[0].message.find("main_listener_port"), std::string::npos);
+  EXPECT_NE(g_findings[0].message.find("command_console_port"), std::string::npos);
   EXPECT_NE(g_findings[0].message.find("below minimum"), std::string::npos);
 }
 
 TEST_F(ConfFileValidateAdversarialTest, RealValidatorRejectsValueAboveMax)
 {
-  int rc = sRealValidate("return { ufsrv = { ufsrv_geogroup = 1, main_listener_port = 70000, sys_runtime = {} } }\n");
+  int rc = sRealValidate("return { ufsrv = { ufsrv_geogroup = 1, command_console_port = 70000, sys_runtime = {} } }\n");
   EXPECT_EQ(rc, 1);
   ASSERT_GE(g_findings.size(), 1u);
-  EXPECT_NE(g_findings[0].message.find("main_listener_port"), std::string::npos);
+  EXPECT_NE(g_findings[0].message.find("command_console_port"), std::string::npos);
   EXPECT_NE(g_findings[0].message.find("above maximum"), std::string::npos);
 }
 
 TEST_F(ConfFileValidateAdversarialTest, RealValidatorRejectsNegativeGeogroup)
 {
-  int rc = sRealValidate("return { ufsrv = { ufsrv_geogroup = -1, main_listener_port = 8080, sys_runtime = {} } }\n");
+  int rc = sRealValidate("return { ufsrv = { ufsrv_geogroup = -1, command_console_port = 8080, sys_runtime = {} } }\n");
   EXPECT_EQ(rc, 1);
   ASSERT_GE(g_findings.size(), 1u);
   EXPECT_NE(g_findings[0].message.find("ufsrv_geogroup"), std::string::npos);
@@ -538,7 +538,7 @@ TEST_F(ConfFileValidateAdversarialTest, RealValidatorAcceptsValidFullFixture)
 TEST_F(ConfFileValidateAdversarialTest, RealValidatorRejectsInvalidUfnetWhenPresent)
 {
   std::string cfg = sWriteTempFile(
-      "return { ufsrv = { ufsrv_geogroup = 1, main_listener_port = 8080, sys_runtime = {} },\n"
+      "return { ufsrv = { ufsrv_geogroup = 1, command_console_port = 8080, sys_runtime = {} },\n"
       "         ufnet = { db_backend = { port = 'not a number' } } }\n");
   std::string validator   = std::string(CMAKE_SOURCE_DIR) + "/etc/core_schema_validator.lua";
   std::string core_schema = std::string(CMAKE_SOURCE_DIR) + "/etc/core_schema_ufsrv.lua";
@@ -554,7 +554,7 @@ TEST_F(ConfFileValidateAdversarialTest, RealValidatorRejectsInvalidUfnetWhenPres
 TEST_F(ConfFileValidateAdversarialTest, RealValidatorAcceptsEmptyUfnet)
 {
   int rc = sRealValidate(
-      "return { ufsrv = { ufsrv_geogroup = 1, main_listener_port = 8080, sys_runtime = {} }, ufnet = {} }\n");
+      "return { ufsrv = { ufsrv_geogroup = 1, command_console_port = 8080, sys_runtime = {} }, ufnet = {} }\n");
   EXPECT_EQ(rc, 0);
   EXPECT_TRUE(g_findings.empty());
 }

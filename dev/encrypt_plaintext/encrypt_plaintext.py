@@ -17,6 +17,8 @@ Encryption:
                           encrypt <plaintext> (or stdin) with that key and print
                           the "enc:v1:<nonce>:<ciphertext>:<tag>" value to place
                           in the config file. Use the SAME key for every secret.
+  --credential-file <path> [plaintext]
+                          encrypt using the 64-hex key in a credential file.
 
 Store the 64-hex key as the systemd credential
 LoadCredential=ufsrv_secret_key:<file> (the file holds exactly the 64 hex chars).
@@ -31,7 +33,7 @@ Usage:
   python3 encrypt_plaintext.py --key-b64 <base64>
   python3 encrypt_plaintext.py --key-text 'passphrase'
   python3 encrypt_plaintext.py --key <64-hex> 'db-password'
-  echo -n 'secret' | python3 encrypt_plaintext.py --key <64-hex>
+  python3 encrypt_plaintext.py --credential-file /opt/ufsrv/etc/secrets/ufsrv_secret_key < secret.txt
 
 Requires: pip install cryptography
 """
@@ -75,6 +77,8 @@ def main():
                     help="derive a 32-byte key from text (SHA-256) and print its 64-hex equivalent")
     ap.add_argument("--key", default=None,
                     help="32-byte key as 64 hex chars (required to encrypt)")
+    ap.add_argument("--credential-file", default=None,
+                    help="read the 64-hex encryption key from an existing credential file")
     ap.add_argument("plaintext", nargs="?", default=None,
                     help="plaintext secret (default: read from stdin)")
     args = ap.parse_args()
@@ -85,9 +89,10 @@ def main():
         args.key_b64 is not None,
         args.key_text is not None,
         args.key is not None,
+        args.credential_file is not None,
     ]
     if sum(modes) > 1:
-        sys.exit("error: --generate-key, --key-file, --key-b64, --key-text and --key are mutually exclusive")
+        sys.exit("error: --generate-key, --key-file, --key-b64, --key-text, --key and --credential-file are mutually exclusive")
 
     if args.generate_key:
         print_key_hex(secrets.token_bytes(KEY_BYTES))
@@ -116,11 +121,26 @@ def main():
         print_key_hex(key)
         return
 
-    if args.key is None:
-        sys.exit("error: --key is required to encrypt (use --generate-key to create one)")
+    encoded_key = args.key
+    if args.credential_file is not None:
+        try:
+            with open(args.credential_file, "rb") as f:
+                # Accept a single hex line with an optional trailing newline.
+                raw_key = f.read(2 * KEY_BYTES + 3)
+            if raw_key.endswith(b"\r\n"):
+                raw_key = raw_key[:-2]
+            elif raw_key.endswith(b"\n"):
+                raw_key = raw_key[:-1]
+            encoded_key = raw_key.decode("ascii")
+        except (OSError, UnicodeError):
+            sys.exit("error: could not read the hex credential file")
+        if len(encoded_key) != 2 * KEY_BYTES:
+            sys.exit("error: credential file must contain exactly 64 hex characters")
+    if encoded_key is None:
+        sys.exit("error: --key or --credential-file is required to encrypt")
 
     try:
-        key = bytes.fromhex(args.key)
+        key = bytes.fromhex(encoded_key)
     except ValueError:
         sys.exit("error: --key must be 64 hex characters (32 bytes)")
     if len(key) != KEY_BYTES:

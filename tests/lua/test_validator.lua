@@ -141,6 +141,29 @@ test("array passes with correct subtype", function()
     assert_eq(r[1], "a")
 end)
 
+test("collections validate each row and preserve order", function()
+    local schema = { listeners = { type = "collection", min_items = 1, items = {
+        port = { type = "integer", required = true, min = 1, max = 65535 },
+    } } }
+    local records = validator.validate_table({ listeners = {{port = 19701}, {port = 20081}} },
+                                             schema, {}, true).listeners
+    assert(records[1].port == 19701 and records[2].port == 20081)
+    for _, invalid in ipairs({
+        {},
+        {{}},
+        {19701},
+        {{port = -1}},
+        {{port = {19701}}},
+        {{port = 19701, [true] = true}},
+        {setmetatable({}, {__index = {port = 19701}})},
+        {{port = 19701, extra = true}},
+        {[1] = {port = 19701}, [3] = {port = 20081}},
+        {named = {port = 19701}},
+    }) do
+        assert(not pcall(validator.validate_table, {listeners = invalid}, schema, {}, false))
+    end
+end)
+
 test("array item type mismatch raises error", function()
     assert_err(function()
         validator.validate_value({"a", 123}, { type = "array", subtype = "string" }, {"k"})
@@ -201,7 +224,7 @@ test("valid_full config passes", function()
     local r = validator.validate_config(cfg,
         etc_dir .. "core_schema_ufsrv.lua",
         etc_dir .. "core_schema_ufnet.lua")
-    assert_eq(r.ufsrv.main_listener_port, 19701)
+    assert_eq(r.ufsrv.command_console_port, 19701)
     assert_eq(r.ufsrv.server_run_mode, "normal")
     assert_eq(r.ufnet.db_backend.port, 19800)
 end)
@@ -248,7 +271,7 @@ test("unknown scope silently ignored", function()
     local cfg = dofile(fixture("unknown_scope.lua"))
     local r = validator.validate_config(cfg,
         etc_dir .. "core_schema_ufsrv.lua", nil)
-    assert_eq(r.ufsrv.main_listener_port, 19701)
+    assert_eq(r.ufsrv.command_console_port, 19701)
     -- some_random_scope is not in the schema, so it's never validated
 end)
 
@@ -274,18 +297,18 @@ test("adjunct-only validation passes", function()
 end)
 
 test("adjunct empty scope is a no-op", function()
-    local cfg = { ufsrv = { ufsrv_geogroup = 1, main_listener_port = 19701 } }
+    local cfg = { ufsrv = { ufsrv_geogroup = 1, command_console_port = 19701 } }
     local r = validator.validate_config(cfg,
         etc_dir .. "core_schema_ufsrv.lua",
         etc_dir .. "adjunct_schema_ufsrvwebsock.lua")
-    assert_eq(r.ufsrv.main_listener_port, 19701)
+    assert_eq(r.ufsrv.command_console_port, 19701)
 end)
 
 test("adjunct empty string treated as nil", function()
-    local cfg = { ufsrv = { ufsrv_geogroup = 1, main_listener_port = 19701 } }
+    local cfg = { ufsrv = { ufsrv_geogroup = 1, command_console_port = 19701 } }
     local r = validator.validate_config(cfg,
         etc_dir .. "core_schema_ufsrv.lua", "")
-    assert_eq(r.ufsrv.main_listener_port, 19701)
+    assert_eq(r.ufsrv.command_console_port, 19701)
 end)
 
 test("three-tier: ufsrv + ufnet + adjunct merge", function()
@@ -316,7 +339,7 @@ test("core + adjunct both nil raises error", function()
 end)
 
 test("adjunct schema is loaded and merged only if not empty", function()
-    local cfg = { ufsrv = { ufsrv_geogroup = 1, main_listener_port = 19701 } }
+    local cfg = { ufsrv = { ufsrv_geogroup = 1, command_console_port = 19701 } }
     -- Pass empty string for adjunct — should work same as nil
     local r = validator.validate_config(cfg,
         etc_dir .. "core_schema_ufsrv.lua", "")
@@ -344,7 +367,7 @@ test("doubly-nested path includes all levels", function()
         local cfg = {
             ufsrv = {
                 ufsrv_geogroup = 1,
-                main_listener_port = 19701,
+                command_console_port = 19701,
                 user_timeouts = { unauthenticated_timeout = "not-a-number" }
             }
         }

@@ -1,11 +1,22 @@
 @PACKAGE_INIT@
 
+# Resolved from this file's own location before any dependency runs: a dependency
+# package config may set PACKAGE_PREFIX_DIR for itself (libSRTP is installed with
+# an absolute install destination and does exactly that), and a consumer's cmake
+# older than 4.x keeps that assignment in this scope.
+get_filename_component(ufsrvcorelib_PREFIX_DIR "${CMAKE_CURRENT_LIST_DIR}/../../../" ABSOLUTE)
+
 include(CMakeFindDependencyMacro)
 find_dependency(uflib)
 find_dependency(OpenSSL)
 find_dependency(PkgConfig)
+if("@UFSRVCORELIB_HAVE_SRTP@")
+    find_dependency(libSRTP)
+endif()
 pkg_check_modules(LUA REQUIRED IMPORTED_TARGET lua)
 pkg_check_modules(JSONC REQUIRED IMPORTED_TARGET json-c)
+pkg_check_modules(CURL REQUIRED IMPORTED_TARGET libcurl)
+pkg_check_modules(MARIADB REQUIRED IMPORTED_TARGET libmariadb)
 pkg_check_modules(JEMALLOC REQUIRED IMPORTED_TARGET jemalloc)
 
 get_filename_component(ufsrvcorelib_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
@@ -33,5 +44,11 @@ set(ufsrvcorelib_LIBRARIES ufsrvcorelib::ufsrvcorelib)
 # Canonical host orchestration modules (compose orchestrator, verifier, rewrite,
 # merge, clean, bootstrap and check).  Consumers must resolve these through this
 # variable instead of vendoring copies into their own trees.
+if(IS_ABSOLUTE "@CMAKE_INSTALL_DATADIR@")
+    set(_ufsrvcorelib_datadir "@CMAKE_INSTALL_DATADIR@")
+else()
+    set(_ufsrvcorelib_datadir "${ufsrvcorelib_PREFIX_DIR}/@CMAKE_INSTALL_DATADIR@")
+endif()
 set_and_check(ufsrvcorelib_HOST_MODULES_DIR
-    "${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_DATADIR@/@_PROJECT_NAME@/cmake-modules/ufsrv_config/host")
+    "${_ufsrvcorelib_datadir}/@_PROJECT_NAME@/cmake-modules/ufsrv_config/host")
+unset(_ufsrvcorelib_datadir)

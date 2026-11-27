@@ -19,6 +19,7 @@
 #include <ufsrvcorelib/ufsrv_core/ufsrv_config/ufsrv_config_value_type.h>
 #include <uflib/main_types.h>
 
+BufferDescriptor *UfsrvConfigListenersAsString_CollectionDescriptor(int field_index, UfsrvConfigValue *value_ptr, BufferDescriptor *buffer_provided);
 BufferDescriptor * UfsrvConfigConfFileStoreOperatingStateAsString_enum_UfsrvConfigStoreOperatingState(int field_index, UfsrvConfigValue *value_ptr, BufferDescriptor *buffer_provided);
 BufferDescriptor * UfsrvConfigRuntimeStoreOperatingStateAsString_enum_UfsrvConfigStoreOperatingState(int field_index, UfsrvConfigValue *value_ptr, BufferDescriptor *buffer_provided);
 BufferDescriptor * UfsrvConfigServerProcessModeAsString_enum_ServerProcessMode(int field_index, UfsrvConfigValue *value_ptr, BufferDescriptor *buffer_provided);

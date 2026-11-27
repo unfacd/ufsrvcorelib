@@ -36,7 +36,8 @@ typedef enum UfsrvConfigValueType {
   UFSRV_CONFIG_VALUE_ENUM             = 6,   ///< int store, validated against named constants
   UFSRV_CONFIG_VALUE_ARRAY            = 7,   ///< Specialised blob type for semantic clarity
   UFSRV_CONFIG_VALUE_BOOL             = 8,    ///< standard c bool type
-  UFSRV_CONFIG_VALUE_DOUBLE           = 9    ///< standard c double type
+  UFSRV_CONFIG_VALUE_DOUBLE           = 9,   ///< standard C double type
+  UFSRV_CONFIG_VALUE_COLLECTION       = 10   ///< Lua array of named scalar rows, transferred to a custom setter
 } UfsrvConfigValueType;
 
 // Config sourcing provenance
@@ -77,6 +78,22 @@ typedef struct {
   size_t  collection_sz;      ///< arrays, lists: total allocation: type_allocation_sz * collection_sz
   UfsrvConfigSource source;     ///< repository source of stored value
 } UfsrvConfigValue;
+
+typedef struct ConfFileSymbolTableEntry ConfFileSymbolTableEntry;
+
+/** A row's entries carry key, type and value. Iterate by field_count. */
+typedef struct {
+  size_t field_count;
+  const ConfFileSymbolTableEntry *fields;
+} ConfFileCollectionRow;
+
+/** COLLECTION payload at stored_value.blob_val. All rows, entries and strings
+ * are held in one allocation. Rows preserve Lua array order. Fields are named
+ * and have no positional ordering. */
+typedef struct {
+  size_t row_count;
+  ConfFileCollectionRow rows[];
+} ConfFileCollection;
 
 // Setter item — operating-state interface
 

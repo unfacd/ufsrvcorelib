@@ -47,8 +47,8 @@
  *   1. Drop the core_fields[] entry, its literal, its symbol line and the Lua key.
  *   2. Regenerate + install.  Fix consumers of the old accessor.
  */
-// @version 64
-// @sha     230f5576d045ec937ddf358928b972cbd2b0f89e
+// @version 67
+// @sha     d4bb12e727d8ec36dff666a85d4d064353052fb3
 
 //These help the generator compile
 #include <netinet/in.h>
@@ -225,36 +225,6 @@ static const UfsrvConfigFieldDescriptorForGenerator core_fields[] = {
     },
 
     // Network listeners
-    {
-        .name            = "main_listener_port",
-        .value_type      = UFSRV_CONFIG_VALUE_INT,
-        .config_file_key = CONF_FILE_LITERAL_MAIN_LISTENER_PORT,
-        .c_lang_type     = "int",
-        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
-        .config_field_default    = { .config = { .stored_value = { .int_val = 19701 } } },
-        .lifecycle = { .on_inflated = "GenericIntInflator", .on_value_available = "GenericIntSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = NULL },
-        .validation      = { .type = UFSRV_CONFIG_CHECK_RANGE, .check = { .range = {1, 65535} } },
-    },
-    {
-        .name            = "main_listener_address",
-        .value_type      = UFSRV_CONFIG_VALUE_STR,
-        .config_file_key = CONF_FILE_LITERAL_MAIN_LISTENER_ADDRESS,
-        .c_lang_type     = "char *",
-        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
-        .config_field_default    = { .config = { .stored_value = { .str_val = "127.0.0.1" }, .type_allocation_sz = 257 } }, //MBUF + nil
-        .lifecycle = { .on_inflated = "GenericStrInflator", .on_value_available = "GenericStrSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = "GenericStrTeardown" },
-        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
-    },
-    {
-        .name            = "main_listener_protocol_id",
-        .value_type      = UFSRV_CONFIG_VALUE_INT,
-        .config_file_key = CONF_FILE_LITERAL_MAIN_LISTENER_PROTOCOL_ID,
-        .c_lang_type     = "unsigned",
-        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
-        .config_field_default    = { .config = { .stored_value = { .int_val = 1 } } },
-        .lifecycle = { .on_inflated = "GenericIntInflator", .on_value_available = "GenericIntSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = NULL },
-        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
-    },
     {
         .name            = "command_console_port",
         .value_type      = UFSRV_CONFIG_VALUE_INT,
@@ -921,6 +891,21 @@ static const UfsrvConfigFieldDescriptorForGenerator core_fields[] = {
         .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
         .config_field_default    = { .config = { .stored_value = { .str_val = "" }, .type_allocation_sz = 1024 } }, //path-sized
         .lifecycle       = { .on_inflated = "GenericStrInflator", .on_value_available = "GenericStrSetter", .on_value_reloaded = "GenericReloadedStub", .on_teardown = "GenericStrTeardown" },
+        .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
+    },
+
+    // Listener configuration records
+    {
+        .name            = "listeners",
+        .value_type      = UFSRV_CONFIG_VALUE_STRUCT,
+        .config_file_key = CONF_FILE_LITERAL_LISTENERS,
+        .c_lang_type     = "CollectionDescriptor",
+        .domain          = UFSRV_CONFIG_DOMAIN_CONFIG,
+        .config_field_default = { .config = { .type_allocation_sz = sizeof(CollectionDescriptor) } },
+        .lifecycle = { .on_inflated = "GenericStructInflator", .on_value_available = NULL, .on_value_reloaded = "GenericReloadedStub", .on_teardown = "GenericStructTeardown" },
+        .is_as_ptr_getter = true,
+        .is_keep_custom_setter = true,
+        // The Lua schema validates rows. The host converts them to descriptors.
         .validation      = { .type = UFSRV_CONFIG_CHECK_NONE },
     },
 

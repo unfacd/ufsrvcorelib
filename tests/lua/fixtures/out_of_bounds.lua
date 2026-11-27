@@ -1,7 +1,7 @@
--- out_of_bounds.lua — main_listener_port below minimum (0 < min=1)
+-- out_of_bounds.lua — command_console_port below minimum (0 < min=1)
 return {
     ufsrv = {
         ufsrv_geogroup     = 1,
-        main_listener_port = 0,
+        command_console_port = 0,
     },
 }

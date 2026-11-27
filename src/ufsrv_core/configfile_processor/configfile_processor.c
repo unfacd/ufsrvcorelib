@@ -73,8 +73,7 @@ sPushScope(ConfFile cp, const char *scope_name)
 /**
  * Push the value at scope.key onto the Lua stack.
  *
- * Supports dot-path keys for one level of nesting
- * (e.g. "database.host" → scope.database.host).
+ * Supports nested dot-path keys (e.g. "rest_server.tls.is_enabled").
  *
  * On success the value is at stack top; on failure the stack is clean.
  * Returns the Lua type tag, or -1 on error (last_error is set).
@@ -90,39 +89,34 @@ sLookupValue(ConfFile cp, const char *scope_name, const char *key)
     return -1;
   }
 
-  /* Check for dot-path */
-  const char *dot = strchr(key, '.');
-  if (dot) {
-    /* Extract the sub-table name (everything before the dot) */
-    size_t subtable_len = (size_t)(dot - key);
-    char   subtable[PRIV_CONFIG_DEFAULT_MAX_KEY_NAME_SZ];
-    if (subtable_len >= sizeof(subtable)) {
+  const char *segment = key;
+  const char *dot;
+  while ((dot = strchr(segment, '.')) != NULL) {
+    size_t length = (size_t)(dot - segment);
+    if (length == 0 || length >= PRIV_CONFIG_DEFAULT_MAX_KEY_NAME_SZ) {
       lua_pop(L, 1);
-      sSetError(cp, CONF_FILE_ERR_ARGUMENT, "sub-table name too long in key '%s'", key);
+      sSetError(cp, CONF_FILE_ERR_ARGUMENT, "invalid sub-table name in key '%s'", key);
       return -1;
     }
-    memcpy(subtable, key, subtable_len);
-    subtable[subtable_len] = '\0';
 
-    /* Push the sub-table */
-    lua_getfield(L, -1, subtable);
+    lua_pushlstring(L, segment, length);
+    lua_gettable(L, -2);
     if (!lua_istable(L, -1)) {
-      lua_pop(L, 2); /* value + scope */
-      sSetError(cp, CONF_FILE_ERR_KEY_NOT_FOUND, "scope '%s': sub-table '%s' not found or not a table", scope_name,
-                subtable);
+      lua_pop(L, 2);
+      sSetError(cp, CONF_FILE_ERR_KEY_NOT_FOUND, "scope '%s': sub-table '%.*s' not found or not a table in key '%s'",
+                scope_name, (int)length, segment, key);
       return -1;
     }
 
-    /* Replace scope with sub-table on the stack */
-    lua_remove(L, -2); /* remove scope, keep sub-table */
-
-    /* Push the inner key on the sub-table */
-    lua_getfield(L, -1, dot + 1);
+    lua_remove(L, -2); /* keep only the current parent table */
+    segment = dot + 1;
   }
-  else {
-    /* Simple key */
-    lua_getfield(L, -1, key);
+  if (!*segment) {
+    lua_pop(L, 1);
+    sSetError(cp, CONF_FILE_ERR_ARGUMENT, "empty field name in key '%s'", key);
+    return -1;
   }
+  lua_getfield(L, -1, segment);
 
   /* Check what we got */
   if (lua_isnil(L, -1)) {
@@ -159,7 +153,10 @@ static const char *const ufsrv_config_scopes[] = {
     "ufsrvwebsock",
     "ufsrvapi",
     "ufsrvmcp",
+    "ufsrvstun",
+    "ufsrvsfu",
     "ufsrvauth",
+    "ufsrvxxx",
     NULL
 };
 
@@ -789,6 +786,139 @@ sResolveConfigFieldAssociatedIndex(const char *key, const void *key_map, size_t 
   return hit ? hit->field_index : UFSRV_CONFIG_FIELD_COUNT;
 }
 
+PUBLIC_API void
+ConfFileCollectionDestroy(UfsrvConfigValue *value)
+{
+  free(value->stored_value.blob_val);
+  *value = (UfsrvConfigValue){0};
+}
+
+/* The sizing pass and the copy pass walk the same raw Lua row. */
+static bool
+sReadCollectionRow(lua_State *lua, ConfFileSymbolTableEntry *fields, char **text,
+                   size_t *field_count, size_t *text_size)
+{
+  lua_pushnil(lua);
+  while (lua_next(lua, -2)) {
+    size_t key_length = 0, string_length = 0;
+    const char *key = lua_type(lua, -2) == LUA_TSTRING ? lua_tolstring(lua, -2, &key_length) : NULL;
+    const char *string = NULL;
+    ConfFileSymbolTableEntry field = {.field_index = UFSRV_CONFIG_FIELD_COUNT};
+    field.value.source = UFSRV_CONFIG_SOURCE_CONFIG_FILE;
+
+    switch (lua_type(lua, -1)) {
+    case LUA_TSTRING:
+      field.type = UFSRV_CONFIG_VALUE_STR;
+      string = lua_tolstring(lua, -1, &string_length);
+      field.value.type_allocation_sz = ++string_length;
+      break;
+    case LUA_TBOOLEAN:
+      field.type = UFSRV_CONFIG_VALUE_BOOL;
+      field.value.stored_value.int_val = lua_toboolean(lua, -1);
+      break;
+    case LUA_TNUMBER:
+      if (lua_isinteger(lua, -1)) {
+        field.type = UFSRV_CONFIG_VALUE_INT;
+        field.value.stored_value.int_val = lua_tointeger(lua, -1);
+      } else {
+        field.type = UFSRV_CONFIG_VALUE_DOUBLE;
+        field.value.stored_value.double_value = lua_tonumber(lua, -1);
+      }
+      break;
+    default:
+      break;
+    }
+
+    if (!key || memchr(key, '\0', key_length) || !field.type ||
+        key_length >= SIZE_MAX - *text_size ||
+        string_length > SIZE_MAX - *text_size - key_length - 1) {
+      lua_pop(lua, 2);
+      return false;
+    }
+    ++key_length;
+    if (fields) {
+      field.key = *text;
+      memcpy(*text, key, key_length);
+      *text += key_length;
+      if (string) {
+        field.value.stored_value.str_val = *text;
+        memcpy(*text, string, string_length);
+        *text += string_length;
+      }
+      fields[*field_count] = field;
+    }
+    ++*field_count;
+    *text_size += key_length + string_length;
+    lua_pop(lua, 1);
+  }
+  return true;
+}
+
+static bool
+sReadCollection(lua_State *lua, UfsrvConfigValue *value, char *errbuf, size_t errsz)
+{
+  size_t length = lua_rawlen(lua, -1);
+  size_t count = 0;
+  lua_pushnil(lua);
+  while (lua_next(lua, -2)) {
+    lua_Integer key = lua_tointeger(lua, -2);
+    if (!lua_isinteger(lua, -2) || key < 1 || (size_t)key > length) {
+      lua_pop(lua, 2);
+      snprintf(errbuf, errsz, "collection must be a dense array");
+      return false;
+    }
+    ++count;
+    lua_pop(lua, 1);
+  }
+  if (count != length) {
+    snprintf(errbuf, errsz, "collection must be a dense array");
+    return false;
+  }
+
+  size_t field_count = 0, text_size = 0;
+  for (size_t i = 0; i < count; ++i) {
+    bool ok = lua_rawgeti(lua, -1, (lua_Integer)i + 1) == LUA_TTABLE &&
+              sReadCollectionRow(lua, NULL, NULL, &field_count, &text_size);
+    lua_pop(lua, 1);
+    if (!ok) {
+      snprintf(errbuf, errsz, "collection row %zu requires named scalar fields", i + 1);
+      return false;
+    }
+  }
+
+  const size_t alignment = _Alignof(ConfFileSymbolTableEntry);
+  if (count > (SIZE_MAX - sizeof(ConfFileCollection) - (alignment - 1)) / sizeof(ConfFileCollectionRow)) return false;
+  size_t header_size = sizeof(ConfFileCollection) + count * sizeof(ConfFileCollectionRow);
+  header_size += (alignment - header_size % alignment) % alignment;
+  if (text_size > SIZE_MAX - header_size ||
+      field_count > (SIZE_MAX - header_size - text_size) / sizeof(ConfFileSymbolTableEntry)) return false;
+  size_t size = header_size + field_count * sizeof(ConfFileSymbolTableEntry) + text_size;
+
+  ConfFileCollection *collection = calloc(1, size);
+  if (!collection) return false;
+  collection->row_count = count;
+  ConfFileSymbolTableEntry *fields = (void *)((char *)collection + header_size);
+  char *text = (char *)(fields + field_count);
+  size_t copied_text_size = 0;
+  for (size_t i = 0; i < count; ++i) {
+    ConfFileCollectionRow *row = &collection->rows[i];
+    row->fields = fields;
+    lua_rawgeti(lua, -1, (lua_Integer)i + 1);
+    bool ok = sReadCollectionRow(lua, fields, &text, &row->field_count, &copied_text_size);
+    lua_pop(lua, 1);
+    if (!ok) {
+      free(collection);
+      return false;
+    }
+    fields += row->field_count;
+  }
+
+  value->stored_value.blob_val = collection;
+  value->type_allocation_sz = size;
+  value->collection_sz = count;
+  return true;
+}
+
 PUBLIC_API int
 ConfFileTransferToConfigValues(ConfFile cp, const ConfFileSymbolTableEntry config_file_symbols_map[], const void *associative_lookup_map, size_t associative_lookup_map_sz, void (*on_error)(const ConfFileSymbolTableEntry *entry, const char *message))
 {
@@ -804,6 +934,8 @@ ConfFileTransferToConfigValues(ConfFile cp, const ConfFileSymbolTableEntry confi
 
     // link up with ufsrv config domain using the provided associative lookup map
     e_mutable->field_index = sResolveConfigFieldAssociatedIndex(e->key, associative_lookup_map, associative_lookup_map_sz);
+
+    if (e->type == UFSRV_CONFIG_VALUE_COLLECTION) ConfFileCollectionDestroy(&e_mutable->value);
 
     // Extract raw value from Lua config
     lua_settop(cp->L, 0);
@@ -834,7 +966,8 @@ ConfFileTransferToConfigValues(ConfFile cp, const ConfFileSymbolTableEntry confi
       break;
     case UFSRV_CONFIG_VALUE_BOOL: expected = LUA_TBOOLEAN;
       break;
-    case UFSRV_CONFIG_VALUE_ARRAY: expected = LUA_TTABLE;
+    case UFSRV_CONFIG_VALUE_ARRAY:
+    case UFSRV_CONFIG_VALUE_COLLECTION: expected = LUA_TTABLE;
       break;
     default:
       if (on_error) {
@@ -958,6 +1091,18 @@ ConfFileTransferToConfigValues(ConfFile cp, const ConfFileSymbolTableEntry confi
       }
       break;
     }
+    case UFSRV_CONFIG_VALUE_COLLECTION: {
+      char errbuf[256] = {0};
+      if (!sReadCollection(cp->L, &e_mutable->value, errbuf, sizeof(errbuf))) {
+        ConfFileCollectionDestroy(&e_mutable->value);
+        if (on_error) on_error(e, errbuf[0] ? errbuf : "could not allocate config collection");
+        failures++;
+        lua_pop(cp->L, 2);
+        continue;
+      }
+      e_mutable->value.source = UFSRV_CONFIG_SOURCE_CONFIG_FILE;
+      break;
+    }
     default:
       break;
     }
@@ -969,6 +1114,7 @@ ConfFileTransferToConfigValues(ConfFile cp, const ConfFileSymbolTableEntry confi
       char errbuf[256] = {0};
       if (!e->lifecycle.on_validate(e, &e_mutable->value, errbuf, sizeof(errbuf))) {
         if (on_error) on_error(e, errbuf[0] ? errbuf : "validation failed");
+        if (e->type == UFSRV_CONFIG_VALUE_COLLECTION) ConfFileCollectionDestroy(&e_mutable->value);
         failures++;
       }
     }

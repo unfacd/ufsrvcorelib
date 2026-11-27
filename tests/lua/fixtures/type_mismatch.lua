@@ -1,7 +1,7 @@
--- type_mismatch.lua — main_listener_port is a string, should be integer
+-- type_mismatch.lua — command_console_port is a string, should be integer
 return {
     ufsrv = {
         ufsrv_geogroup     = 1,
-        main_listener_port = "not-a-number",
+        command_console_port = "not-a-number",
     },
 }

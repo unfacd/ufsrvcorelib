@@ -35,6 +35,10 @@
 #define UFSRV_DEBUG_BUILD_L2                    @UFSRV_DEBUG_L2@
 #define UFSRV_DEBUG_BUILD_L3                    @UFSRV_DEBUG_L3@
 
+#cmakedefine HAVE_VALGRIND
+#cmakedefine HAVE_VALGRIND_DRD
+#cmakedefine HAVE_VALGRIND_MEMCHECK
+
 #define CONFIG_DEFAULT_MAX_CORES                @CONFIG_DEFAULT_MAX_CORES@
 #define CONFIG_DEFAULT_CONFIGFILE_VALIDATOR     "@CONFIG_DEFAULT_CONFIGFILE_VALIDATOR@" ///< name of lua validator script file
 #define CONFIG_DEFAULT_CONFIGFILE_CORE_SCHEMA   "@CONFIG_DEFAULT_CONFIGFILE_CORE_SCHEMA@"   ///< name of core lua config schema file

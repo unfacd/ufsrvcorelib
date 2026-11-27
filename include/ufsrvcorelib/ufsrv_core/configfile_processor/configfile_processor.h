@@ -57,7 +57,7 @@
  * }
  *
  * const char *name = ConfFileGetString(cp, "ufsrv", "server_run_mode");
- * int port = ConfFileGetInt(cp, "ufsrv", "main_listener_port");
+ * int port = ConfFileGetInt(cp, "ufsrv", "command_console_port");
  * if (ConfFileGetLastError(cp) != CONF_FILE_OK) {
  *     // handle missing key
  * }
@@ -361,7 +361,13 @@ ConfFileNextKey(ConfFile cp, const char *scope, int *prev_index);
  */
 PUBLIC_API int ConfFileTransferToConfigValues(ConfFile cp, const ConfFileSymbolTableEntry config_file_symbols_map[], const void *associative_lookup_map, size_t associative_lookup_map_sz, void (*on_error)(const ConfFileSymbolTableEntry *entry, const char *message));
 
-/* ── JSON serialization ─────────────────────────────────────────────────── */
+/**
+ * @brief Release a collection extracted into a temporary config symbol.
+ * @code{.c}
+ * ConfFileCollectionDestroy(&symbol.value);
+ * @endcode
+ */
+PUBLIC_API void ConfFileCollectionDestroy(UfsrvConfigValue *value);
 
 /**
  * @brief Serialize a resolved symbol table to a JSON file.

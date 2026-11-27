@@ -33,6 +33,7 @@
 #include <ufsrvcorelib/ufsrv_core/system/server_process_mode_enum.h>   /* enum ServerProcessMode */
 
 //dont remove
+#include <uflib/collection_descriptor_type.h>
 #include <ufsrvcorelib/ufsrv_core/service/file_loader/file_loader_service_descriptor_type.h>
 #include <ufsrvcorelib/ufsrv_core/instrumentation/instrumentation_backend_type.h>
 
@@ -45,17 +46,7 @@
 typedef struct ec_private_key ec_private_key;
 typedef struct ec_public_key ec_public_key;
 
-#ifndef INCLUDE_UFSRVRESULT_TYPE_H_
-struct UFSRVResult {
-    void *result_user_data;//generic carrier of objects
-    //char result_msg[MAX_UFSRV_RESULT_MSG_SIZE];
-    unsigned result_code;//enum category into array of return message carefully categorized
-    //unsigned result_code_idx; //index within a category
-    unsigned result_type;//enum
-};
-
-typedef struct UFSRVResult UFSRVResult;
-#endif
+#include <ufsrvcorelib/ufsrv_core/ufsrvresult_type.h>
 
 /* Forward declarations — types defined in ufnetcorelib (kept opaque: their
  * real headers, e.g. session_type.h, transitively include config.h, which

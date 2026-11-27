@@ -18,10 +18,10 @@
 #ifndef UFSRVCORELIB_VERSION_H
 #define UFSRVCORELIB_VERSION_H
 
-#define UFSRVCORELIB_MAJOR 1
-#define UFSRVCORELIB_MINOR 9
-#define UFSRVCORELIB_PATCH 24
-#define UFSRVCORELIB_INTERNAL 235
+#define UFSRVCORELIB_MAJOR 2
+#define UFSRVCORELIB_MINOR 0
+#define UFSRVCORELIB_PATCH 0
+#define UFSRVCORELIB_INTERNAL 0
 #define UFSRV_MONOREPO_STEM_VERSION "3.9.1" //historical, representing the version point at which the library was separated from the original monorepo ufsrv
 
 const char *UfsrvCoreLibVersion()      __attribute__((const));
